@@ -33,6 +33,17 @@
     /* --- Шапка: Figma «Журнал» 34 bold + дата сохранения, справа — вход администратора --- */
     .app-header { position: relative; padding: 16px 0 20px; }
     .app-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+    /* Подпись выбранного периода рядом с заголовком: «Октябрь 2026» */
+    .period-badge {
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      background-color: var(--color-surface);
+      color: var(--color-text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
     .group-badge {
       padding: 4px 10px;
       border-radius: var(--radius-pill);
@@ -439,6 +450,7 @@
       <div class="app-title-row">
         <h2 class="app-title" id="appTitle">Журнал</h2>
         <span class="group-badge">24ДММ-2</span>
+        <span class="period-badge" id="periodCaption"></span>
       </div>
       <div class="app-subtitle" id="dataLastUpdated"></div>
     </div>
@@ -562,10 +574,10 @@
         <option value="Платное">Платники</option>
       </select>
       <select id="periodFilter" onchange="renderTable()">
-        <option value="ALL">Всё время</option>
         <option value="WEEK">Неделя</option>
-        <option value="MONTH">Месяц</option>
+        <option value="MONTH" selected>Месяц</option>
         <option value="SEMESTER">Семестр</option>
+        <option value="ALL">Всё время</option>
       </select>
       <select id="subjectFilter" onchange="renderTable()">
         <option value="ALL">Все предметы</option>
@@ -1118,10 +1130,6 @@
         <div class="filter-section">
           <div class="filter-section-title">Период</div>
           <div class="filter-chip-row" id="filterChipsPeriod">
-            <button type="button" class="filter-chip" data-value="ALL" onclick="selectFilterChip('periodFilter','ALL','filterChipsPeriod',this)">
-              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
-              <span>Всё время</span>
-            </button>
             <button type="button" class="filter-chip" data-value="WEEK" onclick="selectFilterChip('periodFilter','WEEK','filterChipsPeriod',this)">
               <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
               <span>Неделя</span>
@@ -1133,6 +1141,10 @@
             <button type="button" class="filter-chip" data-value="SEMESTER" onclick="selectFilterChip('periodFilter','SEMESTER','filterChipsPeriod',this)">
               <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
               <span>Семестр</span>
+            </button>
+            <button type="button" class="filter-chip" data-value="ALL" onclick="selectFilterChip('periodFilter','ALL','filterChipsPeriod',this)">
+              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+              <span>Всё время</span>
             </button>
           </div>
         </div>
@@ -2355,8 +2367,39 @@
     el.innerText = `Пропуски актуальны на: ${dd}.${mm}.${yyyy}, ${hh}:${min}`;
   }
 
+  // Подпись выбранного периода рядом с заголовком. По умолчанию — текущий месяц,
+  // поэтому 1 октября у всех закономерно 0 часов: прошлый месяц в этот период не попадает.
+  // Сами пропуски не меняются — меняется только окно, за которое их считают.
+  function periodCaptionText() {
+    const el = document.getElementById('periodFilter');
+    const value = el ? el.value : 'MONTH';
+    const now = new Date();
+    if (value === 'MONTH') {
+      return `${MONTHS_NOM[now.getMonth()]} ${now.getFullYear()}`;
+    }
+    if (value === 'WEEK') {
+      const range = getPeriodRangeFor('WEEK');
+      const last = new Date(range.end.getTime() - 86400000);
+      const short = (d) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return `Неделя ${short(range.start)} – ${short(last)}`;
+    }
+    if (value === 'SEMESTER') {
+      const range = getSemesterRange(now);
+      const last = new Date(range.end.getTime() - 86400000);
+      const name = (d) => MONTHS_NOM[d.getMonth()].toLowerCase();
+      return `Семестр: ${name(range.start)} ${range.start.getFullYear()} — ${name(last)} ${last.getFullYear()}`;
+    }
+    return 'За всё время';
+  }
+
+  function renderPeriodCaption() {
+    const el = document.getElementById('periodCaption');
+    if (el) el.textContent = periodCaptionText();
+  }
+
   function renderTable() {
     renderDataLastUpdated();
+    renderPeriodCaption();
     const search = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('typeFilter').value;
     const tbody = document.getElementById('studentsTableBody');
