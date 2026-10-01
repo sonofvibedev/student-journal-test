@@ -16,6 +16,7 @@ const PRECACHE_URLS = [
   './env.js',
   './changelog.js',
   './theme.js',
+  './schedule.js',
   './index.html',
   './cabinet.html',
   './app.css',
