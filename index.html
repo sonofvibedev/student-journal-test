@@ -508,6 +508,20 @@
       background: var(--color-surface-3); color: var(--color-text-secondary); }
     .hw-up.is-soon .hw-up-rel { background: var(--color-yellow-soft-bg); color: var(--color-yellow-soft-text); }
     .hw-up.is-over .hw-up-rel { background: var(--color-pink-soft-bg); color: var(--color-pink-soft-text); }
+    /* --- Анимации раздела: только transform и opacity --- */
+    @keyframes view-in { from { opacity: 0; transform: translateY(6px); } }
+    .app-view.view-enter { animation: view-in var(--dur) var(--ease-out); }
+    @keyframes sch-card-in { from { opacity: 0; transform: translateY(8px); } }
+    .sch-lesson.sch-enter { animation: sch-card-in var(--dur) var(--ease-out) backwards;
+      animation-delay: calc(var(--i, 0) * var(--stagger)); }
+    /* Лист выезжает с лёгкой пружиной */
+    .modal.swipe-sheet.fade .modal-dialog { transition: transform var(--dur-slow) var(--ease-spring); }
+    /* Зачёркивание растёт, а не появляется разом: text-decoration анимировать нельзя */
+    .sch-name { position: relative; }
+    .sch-name::after { content: ''; position: absolute; left: 0; right: 0; top: 52%; height: 1.5px;
+      background: currentColor; border-radius: 1px; transform: scaleX(0); transform-origin: left center;
+      transition: transform var(--dur) var(--ease-out); }
+    .sch-lesson.is-done .sch-name::after { transform: scaleX(1); }
     /* Кнопка возврата к текущей неделе */
     .sch-today { display: block; margin: 8px auto 0; min-height: var(--control-h-sm); padding: 0 16px;
       border: 1px solid var(--color-accent); border-radius: var(--radius-pill);
@@ -516,7 +530,7 @@
     .sch-skeleton { display: grid; gap: 8px; }
     .sch-skeleton .skel-line { height: 74px; border-radius: var(--radius-lg); background: var(--color-surface); }
     /* Отмеченное занятие */
-    .sch-lesson.is-done .sch-name { text-decoration: line-through; color: var(--color-text-tertiary); }
+    .sch-lesson.is-done .sch-name { color: var(--color-text-tertiary); }
     /* Нижний лист занятия */
     .ls-when { margin-bottom: 14px; font-size: var(--fs-caption); color: var(--color-text-secondary); }
     .ls-rows { display: grid; gap: 1px; margin-bottom: 16px; border-radius: var(--radius-lg); overflow: hidden;
@@ -535,7 +549,10 @@
       background: var(--color-surface); color: var(--color-text); font-size: var(--fs-button); font-weight: 600; }
     .ls-done .ls-check { flex: none; display: grid; place-items: center; width: 24px; height: 24px;
       border: 2px solid var(--color-border-strong); border-radius: 50%; color: transparent; }
-    .ls-done .ls-check svg { width: 15px; height: 15px; }
+    .ls-done .ls-check { transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+    .ls-done .ls-check svg { width: 15px; height: 15px; opacity: 0; transform: scale(.4);
+      transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur) var(--ease-spring); }
+    .ls-done.on .ls-check svg { opacity: 1; transform: none; }
     .ls-done.on { border-color: var(--color-green); background: var(--color-green-soft-bg); }
     .ls-done.on .ls-check { border-color: var(--color-success-text); background: var(--color-success-text); color: #fff; }
     .hw-admin-item { padding: 10px 12px; margin-bottom: 8px; border-radius: var(--radius-md);
@@ -1679,6 +1696,7 @@
   // «Дедлайны» остались разделом страницы: кнопки в таб-баре у них больше нет, но адрес
   // index.html#deadlines и кнопка «Управлять» в админке работают как прежде.
   const VIEWS = { stats: 'viewStats', teachers: 'viewTeachers', homework: 'viewHomework', deadlines: 'viewDeadlines' };
+  let swipeDrivenView = false;   // раздел меняют свайпом: анимацию покажет swipeIn
   let currentViewName = null;
   function currentView() {
     const h = location.hash.slice(1);
@@ -1708,7 +1726,11 @@
       markDeadlinesSeen();
       updateDeadlinesDot();
     }
-    if (changed) window.scrollTo(0, 0);
+    if (changed) {
+      window.scrollTo(0, 0);
+      // При свайпе раздел уже «въезжает» через swipeIn — не наслаиваем вторую анимацию
+      if (!swipeDrivenView) restartAnimation(document.getElementById(VIEWS[name]), 'view-enter');
+    }
     syncTelegramBackButton();
   }
   window.addEventListener('hashchange', () => showView(currentView()));   // адрес изменили вручную
@@ -1724,7 +1746,9 @@
   enableTabSwipe(() => ['stats', 'teachers', 'homework', 'cabinet'], () => currentViewName, (name, dir) => {
     haptic('selection');
     if (name === 'cabinet') { location.href = 'cabinet.html'; return; }
+    swipeDrivenView = true;
     goView(name);
+    swipeDrivenView = false;
     swipeIn(document.getElementById(VIEWS[name]), dir);
   });
 
@@ -2146,9 +2170,13 @@
   }
 
   function setScheduleDay(day) {
+    if (day === scheduleDay) return;
+    // Вправо по дням — содержимое въезжает слева, и наоборот
+    const dir = day > scheduleDay ? 'left' : 'right';
     scheduleDay = day;
     haptic('selection');
     renderHomeworkView();
+    swipeIn(document.getElementById('hwDayList'), dir);
   }
 
   // Есть ли на эту дату домашка или дедлайн — только тогда под днём ставится точка
@@ -2421,7 +2449,12 @@
       empty.appendChild(sm);
       list.appendChild(empty);
     } else {
-      lessons.forEach(l => list.appendChild(lessonCard(l, iso)));
+      lessons.forEach((l, i) => {
+        const card = lessonCard(l, iso);
+        card.style.setProperty('--i', String(i));
+        card.classList.add('sch-enter');
+        list.appendChild(card);
+      });
     }
 
     // Ближайшая домашка: не старше недели, по возрастанию срока
