@@ -14,6 +14,7 @@ const CACHE_VERSION = 'journal-24dmm2-TEST-v12';
 
 const PRECACHE_URLS = [
   './env.js',
+  './changelog.js',
   './index.html',
   './cabinet.html',
   './app.css',

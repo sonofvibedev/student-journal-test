@@ -227,6 +227,21 @@
     @media (max-width: 576px) {
       .container { padding-left: 16px; padding-right: 16px; }
     }
+    /* --- Подвал кабинета: версия и история изменений --- */
+    .cab-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      flex-wrap: wrap; margin: 28px 0 8px; padding-top: 14px;
+      border-top: 1px solid var(--color-separator); font-size: var(--fs-small);
+      color: var(--color-text-tertiary); }
+    .cab-footer b { color: var(--color-text-secondary); font-weight: 600; }
+    .cl-link { background: none; border: 0; padding: 0; font-size: var(--fs-small);
+      font-weight: 600; color: var(--color-accent); }
+    .cl-entry + .cl-entry { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--color-separator); }
+    .cl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .cl-ver { font-size: var(--fs-body); font-weight: 700; color: var(--color-text); }
+    .cl-date { font-size: var(--fs-small); color: var(--color-text-tertiary); }
+    .cl-title { margin-top: 2px; font-size: var(--fs-caption); color: var(--color-text-secondary); }
+    .cl-list { margin: 8px 0 0; padding-left: 18px; color: var(--color-text); font-size: var(--fs-caption); }
+    .cl-list li { margin-bottom: 6px; }
   </style>
 </head>
 <body>
@@ -550,6 +565,12 @@
       </details>
     </div>
 
+    <!-- Версия приложения и полная история изменений (код — changelog.js) -->
+    <div class="cab-footer">
+      <span>Журнал 24ДММ-2 · версия <b id="cabinetVersion">—</b></span>
+      <button type="button" class="cl-link" onclick="openChangelogModal()">История изменений</button>
+    </div>
+
   </div>
 </div>
 
@@ -579,6 +600,24 @@
     <span id="cabinetAnnouncementsDot" class="tabbar-badge-dot d-none" aria-label="Новые сообщения"></span>
   </button>
 </nav>
+
+<!-- История изменений: все версии -->
+<div class="modal fade" id="changelogModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white">История изменений</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="changelogList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary fw-bold w-100" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Что нового -->
 <!-- Замена стандартного alert() -->
@@ -670,6 +709,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+<script src="changelog.js?v=12"></script>
 <script src="shared.js?v=12"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="studak.js?v=12"></script>
@@ -888,35 +928,12 @@
 
     document.getElementById('cabinetSkeleton').classList.add('d-none');
     await openPersonalCabinet();
+    renderAppVersionLabel('cabinetVersion');
     checkWhatsNew();
   }
 
-  // "Что нового" — тот же список, версия и ключ localStorage, что в index.html, так что
-  // увиденное здесь не покажется повторно на главной странице (и наоборот). WHATS_NEW_DATE
-  // подставляется автоматически скриптом deploy-fix.ps1 при каждом деплое.
-  const WHATS_NEW_VERSION = 10;
-  const WHATS_NEW_DATE = '28.09.2026, 15:40';
-  const WHATS_NEW_ITEMS = [
-    'Studak — электронный пропуск группы: кнопка «Studak» в шапке личного кабинета открывает его на весь экран',
-    'Нажмите на пропуск — на обороте QR-код. Он одноразовый, живёт 5 минут и сам обновляется, пока пропуск открыт',
-    'QR проверяется камерой любого телефона без входа: видно только ФИО, роль, номер в списке, логин и фото',
-    'В Telegram в кабинете появилась строка «Сканировать пропуск» — проверка QR прямо в мини-приложении',
-    'Пропуск закрывается крестиком или свайпом вниз, наклоняется вслед за телефоном'
-  ];
-
-  function checkWhatsNew() {
-    const seenVersion = Number(lsGet('whats_new_seen') || 0);
-    if (seenVersion >= WHATS_NEW_VERSION) return;
-
-    document.getElementById('whatsNewDate').innerText = `Обновлено: ${WHATS_NEW_DATE}`;
-    document.getElementById('whatsNewList').innerHTML = WHATS_NEW_ITEMS.map(i => `<li class="mb-1">${i}</li>`).join('');
-    const modalEl = document.getElementById('whatsNewModal');
-    const modal = new bootstrap.Modal(modalEl);
-    modalEl.addEventListener('hidden.bs.modal', () => {
-      lsSet('whats_new_seen', String(WHATS_NEW_VERSION));
-    }, { once: true });
-    modal.show();
-  }
+  // «Что нового», номер версии и история изменений — в changelog.js (общий для обеих страниц).
+  // Там же checkWhatsNew(): окно показывается один раз на каждую новую версию.
 
   function getStarostaContact() {
     const exact = appData.students.find(s => s.telegramUsername && (s.role || '').trim().toLowerCase() === 'староста');

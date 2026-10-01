@@ -1235,6 +1235,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+<script src="changelog.js?v=12"></script>
 <script src="shared.js?v=12"></script>
 <script>
   // GITHUB_OWNER, GITHUB_REPO, DATA_PATH — в env.js
@@ -1526,34 +1527,8 @@
     checkWhatsNew();
   }
 
-  // "Что нового" — короткий список последних изменений, показывается один раз после
-  // обновления сайта (localStorage 'whats_new_seen' общий с cabinet.html, тот же ключ).
-  // WHATS_NEW_DATE подставляется автоматически скриптом deploy-fix.ps1 при каждом деплое —
-  // руками её трогать не нужно. При каждом заметном обновлении: поднять WHATS_NEW_VERSION
-  // и заменить WHATS_NEW_ITEMS (значения должны совпадать в index.html и cabinet.html).
-  const WHATS_NEW_VERSION = 10;
-  const WHATS_NEW_DATE = '28.09.2026, 15:40';
-  const WHATS_NEW_ITEMS = [
-    'Studak — электронный пропуск группы: кнопка «Studak» в шапке личного кабинета открывает его на весь экран',
-    'Нажмите на пропуск — на обороте QR-код. Он одноразовый, живёт 5 минут и сам обновляется, пока пропуск открыт',
-    'QR проверяется камерой любого телефона без входа: видно только ФИО, роль, номер в списке, логин и фото',
-    'В Telegram в кабинете появилась строка «Сканировать пропуск» — проверка QR прямо в мини-приложении',
-    'Пропуск закрывается крестиком или свайпом вниз, наклоняется вслед за телефоном'
-  ];
-
-  function checkWhatsNew() {
-    const seenVersion = Number(lsGet('whats_new_seen') || 0);
-    if (seenVersion >= WHATS_NEW_VERSION) return;
-
-    document.getElementById('whatsNewDate').innerText = `Обновлено: ${WHATS_NEW_DATE}`;
-    document.getElementById('whatsNewList').innerHTML = WHATS_NEW_ITEMS.map(i => `<li class="mb-1">${i}</li>`).join('');
-    const modalEl = document.getElementById('whatsNewModal');
-    const modal = new bootstrap.Modal(modalEl);
-    modalEl.addEventListener('hidden.bs.modal', () => {
-      lsSet('whats_new_seen', String(WHATS_NEW_VERSION));
-    }, { once: true });
-    modal.show();
-  }
+  // «Что нового», номер версии и история изменений — в changelog.js (общий для обеих страниц).
+  // Там же checkWhatsNew(): окно показывается один раз на каждую новую версию.
 
   // Строки списка появляются по очереди только после загрузки, смены сортировки или фильтров —
   // не на каждую букву в поиске и не после сохранения
