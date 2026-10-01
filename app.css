@@ -749,10 +749,11 @@ h6, .h6 { font-size: var(--fs-body); font-weight: 600; letter-spacing: var(--tra
 }
 .tabbar-item:hover { color: var(--color-text-secondary); }
 .tabbar-item.active { color: var(--color-accent); font-weight: 500; }
-/* Четыре кнопки: подпись не вылезает за кнопку; на узких экранах (до 380 px) шрифт чуть мельче */
+/* Четыре кнопки: подпись не вылезает за кнопку и не выходит за низ панели.
+   На узких экранах шрифт подписей чуть мельче у всех четырёх сразу — слова не сокращаем. */
 .tabbar-item > span:not(.tab-selection):not(.tabbar-badge-dot) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 380px) {
-  .tabbar-item { padding: 0; font-size: 10.5px; letter-spacing: -0.4px; }
+  .tabbar-item { padding: 0; font-size: 10px; letter-spacing: -0.45px; }
 }
 .tabbar-item .tab-ico { flex: none; width: var(--tab-icon); height: var(--tab-icon); }
 .tabbar-item:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -6px; border-radius: 100px; }
