@@ -26,6 +26,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Общая дизайн-система (токены, шрифты, компоненты, анимации) -->
   <link href="app.css?v=12" rel="stylesheet"><!-- ?v= — та же цифра, что CACHE_VERSION в sw.js: новая страница не возьмёт старый файл из кэша -->
+  <!-- Тема: светлая/тёмная/системная и цветовая гамма. Сразу после app.css и до отрисовки -->
+  <script src="theme.js?v=12"></script>
   <style>
     /* ===== Журнал: стили только этой страницы (токены и общие компоненты — в app.css) ===== */
     .container { max-width: 1100px; }
@@ -48,7 +50,7 @@
       padding: 4px 10px;
       border-radius: var(--radius-pill);
       background-color: rgba(var(--color-accent-rgb), 0.15);
-      color: #4dabff;
+      color: var(--color-accent-soft);
       font-size: 13px;
       font-weight: 600;
       line-height: 1.4;
@@ -58,7 +60,7 @@
     /* --- Дедлайны в окне администратора --- */
     .dl-admin-item { padding: 12px 14px; margin-bottom: 8px; border-radius: var(--radius-lg); background: var(--color-surface-3); }
     .dl-admin-item.is-past { opacity: .6; }
-    .dl-admin-item.is-zachet { box-shadow: inset 4px 0 0 #bf5af2; }
+    .dl-admin-item.is-zachet { box-shadow: inset 4px 0 0 var(--color-purple); }
     .dl-admin-subject { font-weight: 600; color: var(--color-text); }
     .dl-admin-text { margin: 2px 0 6px; color: var(--color-text-2); white-space: pre-line; overflow-wrap: anywhere; }
     .dl-admin-meta { font-size: 13px; color: var(--color-text-secondary); }
@@ -81,8 +83,8 @@
     .va-bell:active::before { transform: scale(.92); background: var(--color-surface-2); }
     .va-bell:focus-visible { outline: none; }
     .va-bell:focus-visible::before { box-shadow: 0 0 0 2px var(--color-accent); }
-    .va-bell.has-unread svg { color: #fff; }
-    .va-bell-count { position: absolute; top: 2px; left: 22px; min-width: 19px; height: 19px; padding: 0 5px; border: 2px solid var(--color-bg); border-radius: 999px; background: #ff3b30; color: #fff; font-size: 11px; font-weight: 700; line-height: 15px; letter-spacing: -.2px; text-align: center; font-variant-numeric: tabular-nums; box-sizing: border-box; pointer-events: none; }
+    .va-bell.has-unread svg { color: var(--color-text); }
+    .va-bell-count { position: absolute; top: 2px; left: 22px; min-width: 19px; height: 19px; padding: 0 5px; border: 2px solid var(--color-bg); border-radius: 999px; background: var(--color-danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 15px; letter-spacing: -.2px; text-align: center; font-variant-numeric: tabular-nums; box-sizing: border-box; pointer-events: none; }
     .va-empty { padding: 24px 0; color: var(--color-text-tertiary); text-align: center; }
     #announcementsSheet .student-summary-card { background: var(--color-surface-3); }
     #announcementsSheet .text-white { white-space: pre-line; }
@@ -191,7 +193,7 @@
     .sort-dropdown-item.active,
     .sort-dropdown-item.active:hover {
       display: inline-flex;
-      background-color: var(--color-green);
+      background-color: var(--color-active);
       border-radius: 296px;
     }
     .sort-dropdown-item.active .check-icon { display: inline-flex; }
@@ -213,7 +215,7 @@
       height: 5px;
       margin: 0 auto;
       border-radius: 296px;
-      background-color: #fff;
+      background-color: var(--color-border-strong);
     }
     .filter-sheet-header {
       display: flex;
@@ -254,7 +256,7 @@
       -webkit-tap-highlight-color: transparent;
       transition: transform var(--dur-fast) var(--ease-out);
     }
-    .filter-chip.active { border-color: var(--color-green); background-color: var(--color-green); }
+    .filter-chip.active { border-color: var(--color-active); background-color: var(--color-active); }
     .filter-chip.active .chip-check { display: inline-flex; }
     .filter-sheet-footer { flex-shrink: 0; padding: 12px 20px 16px; }
     .filter-sheet-apply {
@@ -263,7 +265,7 @@
       min-height: var(--control-h-lg);
       border: 0;
       border-radius: var(--radius-md);
-      background-color: var(--color-green);
+      background-color: var(--color-active);
       color: #fff;
       font-size: var(--fs-button);
       letter-spacing: -0.63px;
@@ -329,9 +331,9 @@
       letter-spacing: -0.2px;
       font-variant-numeric: tabular-nums;
     }
-    .hours-circle.hours-green { background-color: rgba(52, 199, 89, 0.14); color: #34c759; }
-    .hours-circle.hours-warning { background-color: rgba(255, 214, 10, 0.14); color: #ffd60a; }
-    .hours-circle.hours-danger { background-color: rgba(255, 98, 143, 0.16); color: var(--color-danger-line); }
+    .hours-circle.hours-green { background-color: var(--color-ok-bg); color: var(--color-success-text); }
+    .hours-circle.hours-warning { background-color: var(--color-warn-bg); color: var(--color-warning); }
+    .hours-circle.hours-danger { background-color: var(--color-bad-bg); color: var(--color-danger-line); }
     .uvazh-value {
       width: var(--hours-size);
       text-align: center;
@@ -1362,7 +1364,7 @@
   // Работает только внутри Telegram (есть initData). В обычном браузере и в PWA TG = null,
   // и функции ниже ничего не делают.
   const TG = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) ? window.Telegram.WebApp : null;
-  const APP_BG_COLOR = '#060606';
+  // Цвет шапки и фона в Telegram берём из текущей темы: appBgColor() — в theme.js
 
   function tgSupports(version) {
     return !!(TG && typeof TG.isVersionAtLeast === 'function' && TG.isVersionAtLeast(version));
@@ -1385,10 +1387,11 @@
     document.documentElement.dataset.tgScheme = TG.colorScheme || 'dark';
     try {
       if (tgSupports('6.1')) {
-        TG.setHeaderColor(APP_BG_COLOR);
-        TG.setBackgroundColor(APP_BG_COLOR);
+        const bg = appBgColor();
+        TG.setHeaderColor(bg);
+        TG.setBackgroundColor(bg);
       }
-      if (tgSupports('7.10') && TG.setBottomBarColor) TG.setBottomBarColor(APP_BG_COLOR);
+      if (tgSupports('7.10') && TG.setBottomBarColor) TG.setBottomBarColor(appBgColor());
     } catch (e) {}
   }
 
@@ -2102,6 +2105,16 @@
   // --- Аналитика по группе (график) ---
   let analyticsChartInstance = null;
 
+  // Цвета графика берём из текущей темы, а не прописываем числом
+  function chartColor(token, fallback) {
+    try {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+      return v || fallback;
+    } catch (e) { return fallback; }
+  }
+  // Сменили тему — перерисовываем график новыми цветами
+  onThemeChange(() => { if (analyticsChartInstance) renderAnalyticsChart(); });
+
   // --- Расширенная статистика по группе ---
   function renderExtendedStats() {
     const totalStudents = appData.students.length;
@@ -2164,7 +2177,7 @@
         datasets: [{
           label: 'Неуваж. часов',
           data: values,
-          backgroundColor: '#0088ff',
+          backgroundColor: chartColor('--color-accent', '#0088ff'),
           borderRadius: 4,
           borderSkipped: 'start',
           barThickness: 18
@@ -2179,8 +2192,8 @@
           tooltip: { callbacks: { title: (items) => entries[items[0].dataIndex][0], label: (item) => ` ${item.raw} ч неуваж.` } }
         },
         scales: {
-          x: { ticks: { color: '#6c6c71', precision: 0 }, grid: { color: '#1f1f1f' }, beginAtZero: true },
-          y: { ticks: { color: '#c7c7cc', font: { size: 12 } }, grid: { display: false } }
+          x: { ticks: { color: chartColor('--color-text-tertiary', '#6c6c71'), precision: 0 }, grid: { color: chartColor('--color-separator', '#1f1f1f') }, beginAtZero: true },
+          y: { ticks: { color: chartColor('--color-text-2', '#c7c7cc'), font: { size: 12 } }, grid: { display: false } }
         }
       }
     });
