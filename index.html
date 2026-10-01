@@ -1621,6 +1621,12 @@
     setActiveTab(document.querySelector(`.bottom-tabbar .tabbar-item[data-view="${name}"]`));
     if (name === 'teachers') { renderTeachersList(); updateAdminUI(); }
     if (name === 'homework') { renderHomeworkView(); updateAdminUI(); }
+    // Плашка месяца и «Пропуски актуальны на» относятся к пропускам:
+    // в «Домашке» они сбивают с толку, поэтому видны только в «Статистике».
+    // Колокольчик объявлений и бейдж группы остаются на всех разделах.
+    const absenceHeader = name !== 'homework';
+    document.getElementById('periodCaption').classList.toggle('d-none', !absenceHeader);
+    document.getElementById('dataLastUpdated').classList.toggle('d-none', !absenceHeader);
     if (name === 'deadlines') {
       renderDeadlines();
       markDeadlinesSeen();
