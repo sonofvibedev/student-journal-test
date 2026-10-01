@@ -1,0 +1,3264 @@
+﻿<!DOCTYPE html>
+<html lang="ru" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Журнал 24ДММ-2</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#060606">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Журнал">
+
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Аналитика (график) и Excel-отчёт для деканата -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Общая дизайн-система (токены, шрифты, компоненты, анимации) -->
+  <link href="app.css?v=11" rel="stylesheet"><!-- ?v= — та же цифра, что CACHE_VERSION в sw.js: новая страница не возьмёт старый файл из кэша -->
+  <style>
+    /* ===== Журнал: стили только этой страницы (токены и общие компоненты — в app.css) ===== */
+    .container { max-width: 1100px; }
+
+    /* --- Шапка: Figma «Журнал» 34 bold + дата сохранения, справа — вход администратора --- */
+    .app-header { position: relative; padding: 16px 0 20px; }
+    .app-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+    .group-badge {
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      background-color: rgba(var(--color-accent-rgb), 0.15);
+      color: #4dabff;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    /* --- Дедлайны в окне администратора --- */
+    .dl-admin-item { padding: 12px 14px; margin-bottom: 8px; border-radius: var(--radius-lg); background: var(--color-surface-3); }
+    .dl-admin-item.is-past { opacity: .6; }
+    .dl-admin-item.is-zachet { box-shadow: inset 4px 0 0 #bf5af2; }
+    .dl-admin-subject { font-weight: 600; color: var(--color-text); }
+    .dl-admin-text { margin: 2px 0 6px; color: var(--color-text-2); white-space: pre-line; overflow-wrap: anywhere; }
+    .dl-admin-meta { font-size: 13px; color: var(--color-text-secondary); }
+    .dl-admin-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .dl-admin-group { margin: 14px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-tertiary); }
+
+    /* --- Шапка: аватарка вошедшего студента → личный кабинет; без входа — иконка профиля --- */
+    .hdr-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+    /* --- Колокольчик объявлений и лист снизу --- */
+    .va-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: 10px; padding: 12px 0 18px; }
+    .va-header .app-header-main { display: contents; }
+    .va-header .app-title-row { grid-column: 1; grid-row: 1; align-self: center; }
+    .va-header .hdr-actions { grid-column: 2; grid-row: 1; gap: 6px; }
+    .va-header .app-subtitle { grid-column: 1 / -1; grid-row: 2; margin-top: 6px; }
+    .va-header .app-title { font-size: 28px; }
+    /* Колокольчик: зона нажатия 44×44, счётчик — в правом верхнем углу кружка */
+    .va-bell { position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin: -4px -4px -4px 0; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--color-text); -webkit-tap-highlight-color: transparent; }
+    .va-bell::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--color-surface); transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+    .va-bell svg { position: relative; width: 22px; height: 22px; }
+    .va-bell:active::before { transform: scale(.92); background: var(--color-surface-2); }
+    .va-bell:focus-visible { outline: none; }
+    .va-bell:focus-visible::before { box-shadow: 0 0 0 2px var(--color-accent); }
+    .va-bell.has-unread svg { color: #fff; }
+    .va-bell-count { position: absolute; top: 2px; left: 22px; min-width: 19px; height: 19px; padding: 0 5px; border: 2px solid var(--color-bg); border-radius: 999px; background: #ff3b30; color: #fff; font-size: 11px; font-weight: 700; line-height: 15px; letter-spacing: -.2px; text-align: center; font-variant-numeric: tabular-nums; box-sizing: border-box; pointer-events: none; }
+    .va-empty { padding: 24px 0; color: var(--color-text-tertiary); text-align: center; }
+    #announcementsSheet .student-summary-card { background: var(--color-surface-3); }
+    #announcementsSheet .text-white { white-space: pre-line; }
+
+    /* --- Метрики администратора --- */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    /* --- Поиск: Figma 56px, радиус 14, лупа слева --- */
+    #searchInput {
+      height: var(--search-h);
+      min-height: var(--search-h);
+      margin-bottom: 10px !important;
+      padding: 0 16px 0 37px;
+      border: 0;
+      border-radius: var(--radius-lg);
+      background: var(--color-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18' fill='%236C6C71'%3E%3Cpath fill-rule='evenodd' d='M7.42 1.712a5.708 5.708 0 1 0 0 11.416A5.708 5.708 0 0 0 7.42 1.712M0 7.42a7.42 7.42 0 1 1 14.84 0A7.42 7.42 0 0 1 0 7.42'/%3E%3Cpath fill-rule='evenodd' d='M11.952 11.951a.856.856 0 0 1 1.21 0l4.566 4.566a.856.856 0 1 1-1.21 1.21l-4.566-4.566a.856.856 0 0 1 0-1.21'/%3E%3C/svg%3E") no-repeat 11px center / 18px;
+      color: var(--color-text);
+      font-size: var(--fs-body) !important;
+      letter-spacing: var(--tracking);
+    }
+    #searchInput:focus {
+      background-color: var(--color-surface);
+      box-shadow: 0 0 0 2px rgba(var(--color-accent-rgb), 0.5);
+    }
+
+    /* --- Панель: «Фильтр» слева, сортировка справа (Figma), кнопки администратора ниже --- */
+    .toolbar-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .toolbar-main {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .filter-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: var(--control-h-lg);
+      padding: 0 16px 0 18px;
+      border: 0;
+      border-radius: var(--radius-md);
+      background-color: var(--color-surface);
+      color: var(--color-text);
+      font-size: var(--fs-button);
+      letter-spacing: -0.63px;
+      cursor: pointer;
+      transition: transform var(--dur-fast) var(--ease-out);
+    }
+    .filter-toggle-btn svg { flex: none; width: 18px; height: 18px; }
+    .filter-toggle-btn .chevron { width: 14px; height: 14px; color: var(--color-text-tertiary); }
+    .sort-icon-btn {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--control-h);
+      height: var(--control-h);
+      border: 0;
+      border-radius: var(--radius-md);
+      background-color: var(--color-surface);
+      color: var(--color-text);
+      cursor: pointer;
+      transition: transform var(--dur-fast) var(--ease-out);
+    }
+    .sort-icon-btn svg { width: 22px; height: 22px; }
+    .filter-toggle-btn:focus-visible,
+    .sort-icon-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+    /* Панель кнопок администратора: flex задаём здесь, чтобы d-none (!important) надёжно её скрывал */
+    .action-buttons-group { display: flex; flex-basis: 100%; }
+    .action-buttons-group .btn { white-space: nowrap; }
+    .btn-icon { width: 14px; height: 14px; margin-right: 5px; vertical-align: -2px; }
+
+    /* --- Галочка «Done» (Figma) у активной сортировки и активного чипа --- */
+    .check-icon,
+    .chip-check { display: none; flex: none; width: 18px; height: 18px; }
+    .check-icon svg,
+    .chip-check svg { width: 100%; height: 100%; }
+
+    /* --- Лист «Сортировать по» (пункты — как в Figma Sorting 0-654) --- */
+    .sort-sheet-body { padding: 10px 16px 22px; }
+    .sort-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 44px;
+      padding: 4px 14px;
+      border-radius: var(--radius-md);
+      color: var(--color-text);
+      font-size: var(--fs-body);
+      letter-spacing: -0.63px;
+      text-decoration: none;
+    }
+    .sort-dropdown-item:hover { color: var(--color-text); background-color: var(--color-surface-3); }
+    .sort-dropdown-item.active,
+    .sort-dropdown-item.active:hover {
+      display: inline-flex;
+      background-color: var(--color-green);
+      border-radius: 296px;
+    }
+    .sort-dropdown-item.active .check-icon { display: inline-flex; }
+    .sort-divider { margin: 8px 0; border-color: var(--color-separator); opacity: 1; }
+
+    /* --- Лист «Фильтры» — Figma Filtration (0-665) --- */
+    .modal-content.filter-sheet {
+      border: 0;
+      background-color: var(--color-surface-sunken);
+      color: var(--color-text);
+    }
+    /* Зона перетаскивания: ручка + заголовок. touch-action: none — жест не уходит в прокрутку страницы */
+    .sheet-drag { flex-shrink: 0; padding-top: 6px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .sheet-drag:active { cursor: grabbing; }
+    .sheet-close:focus { position: absolute; top: 14px; right: 16px; z-index: 2; padding: 6px 12px; border: 0; border-radius: 999px; background: var(--color-surface-3); color: var(--color-text); }
+    .filter-sheet-handle {
+      flex-shrink: 0;
+      width: 36px;
+      height: 5px;
+      margin: 0 auto;
+      border-radius: 296px;
+      background-color: #fff;
+    }
+    .filter-sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      margin-top: 6px;
+      padding: 0 16px;
+    }
+    .filter-sheet-title { color: var(--color-text); font-size: var(--fs-body); font-weight: 600; letter-spacing: var(--tracking); }
+    .filter-sheet-body { flex: 1 1 auto; overflow-y: auto; padding: 18px 16px 0; }
+    .filter-section { margin-bottom: 32px; }
+    .filter-section-title {
+      margin-bottom: 16px;
+      color: var(--color-text);
+      font-size: var(--fs-h2);
+      font-weight: 600;
+      line-height: 22px;
+      letter-spacing: var(--tracking);
+    }
+    .filter-chip-row { display: flex; flex-wrap: wrap; gap: 13px; }
+    #filterChipsSubject { gap: 5px; }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-width: 75px;
+      min-height: var(--control-h-sm);
+      padding: 4px 10px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 295px;
+      background: none;
+      color: var(--color-text);
+      font-size: var(--fs-chip);
+      letter-spacing: -0.63px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform var(--dur-fast) var(--ease-out);
+    }
+    .filter-chip.active { border-color: var(--color-green); background-color: var(--color-green); }
+    .filter-chip.active .chip-check { display: inline-flex; }
+    .filter-sheet-footer { flex-shrink: 0; padding: 12px 20px 16px; }
+    .filter-sheet-apply {
+      display: block;
+      width: 100%;
+      min-height: var(--control-h-lg);
+      border: 0;
+      border-radius: var(--radius-md);
+      background-color: var(--color-green);
+      color: #fff;
+      font-size: var(--fs-button);
+      letter-spacing: -0.63px;
+      cursor: pointer;
+      transition: transform var(--dur-fast) var(--ease-out);
+    }
+
+    /* --- Список студентов — Figma Pass_String: карточка 68px, радиус 14 --- */
+    .students-list-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 12px 10px;
+      color: var(--color-text-tertiary);
+      font-size: var(--fs-caption);
+      letter-spacing: var(--tracking);
+    }
+    .students-list-header .col-num { width: 28px; flex: none; padding-right: 8px; text-align: right; }
+    .students-list-header .col-hours-labels { margin-left: auto; display: flex; gap: 25px; flex: none; }
+    .students-list-header .col-hours-labels span { width: var(--hours-size); display: flex; justify-content: center; white-space: nowrap; }
+    #studentsTableBody { display: flex; flex-direction: column; gap: var(--space-4); }
+    .student-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: var(--row-h);
+      padding: 10px 12px;
+      border-radius: var(--radius-lg);
+      background-color: var(--color-surface-sunken);
+    }
+    .student-row .col-num { width: 28px; flex: none; padding-right: 8px; text-align: right; }
+    .student-row .col-name { flex: 1 1 auto; min-width: 0; line-height: 20px; }
+    .student-row .col-hours-values { flex: none; display: flex; align-items: center; gap: 25px; margin-left: 6px; }
+    .journal-num {
+      color: var(--color-text);
+      font-size: var(--fs-caption);
+      font-weight: 500;
+      letter-spacing: var(--tracking);
+      font-variant-numeric: tabular-nums;
+    }
+    .student-name {
+      color: var(--color-accent);
+      font-size: var(--fs-body);
+      line-height: 20px;
+      letter-spacing: var(--tracking);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .student-name:hover { color: var(--color-accent-hover); }
+
+    /* Бейдж неуваж. часов — тонированная «таблетка»: приглушённый цветной фон и цветное число.
+       Пороги: 0–4 зелёный, 5–8 жёлтый, 9+ красный */
+    .hours-circle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: var(--hours-size);
+      height: 28px;
+      padding: 0 10px;
+      border-radius: var(--radius-pill);
+      font-size: var(--fs-chip);
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      font-variant-numeric: tabular-nums;
+    }
+    .hours-circle.hours-green { background-color: rgba(52, 199, 89, 0.14); color: #34c759; }
+    .hours-circle.hours-warning { background-color: rgba(255, 214, 10, 0.14); color: #ffd60a; }
+    .hours-circle.hours-danger { background-color: rgba(255, 98, 143, 0.16); color: var(--color-danger-line); }
+    .uvazh-value {
+      width: var(--hours-size);
+      text-align: center;
+      color: var(--color-text-muted);
+      font-size: var(--fs-button);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Скелетон строки списка — те же размеры, что у настоящей карточки */
+    .skeleton-row { pointer-events: none; }
+    .skeleton-row .skel-num { width: 18px; height: 14px; margin: 0 8px 0 4px; }
+    .skeleton-row .skel-name { flex: 0 1 60%; height: 16px; }
+    .skeleton-row:nth-child(2n) .skel-name { flex-basis: 45%; }
+    .skeleton-row:nth-child(3n) .skel-name { flex-basis: 70%; }
+    .skeleton-row .skel-circle { flex: none; width: var(--hours-size); height: var(--hours-size); margin-left: auto; border-radius: 50%; }
+
+    /* --- Окна «Внести пропуски» --- */
+    .quick-hour-btn { min-width: 50px; font-weight: 600; }
+    .subject-hint { margin-top: 10px; font-size: var(--fs-small); line-height: 1.4; }
+    .subject-off { opacity: 0.4; }
+
+    /* --- Карточки преподавателей: цветная плашка с иконкой предмета, раскрытие по тапу --- */
+    /* Разделы главной: заголовки; подпись вкладки «Преподаватели» (на узких экранах — «Преподы») */
+    .view-title { margin: 4px 2px 14px; color: var(--color-text); font-size: 22px; font-weight: 600; letter-spacing: -.3px; }
+    .view-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .tabbar-item .lbl-short { display: none; }
+    @media (max-width: 380px) { .tabbar-item .lbl-full { display: none; } .tabbar-item .lbl-short { display: inline; } }
+    .teacher-card {
+      padding: 14px 16px;
+      border-radius: var(--radius-lg);
+      background-color: var(--color-surface-3);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform var(--dur-fast) var(--ease-out);
+    }
+    .teacher-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .teacher-card-edit-btn {
+      padding: 4px;
+      border: 0;
+      background: none;
+      color: var(--color-text-secondary);
+      line-height: 0;
+      cursor: pointer;
+    }
+    .teacher-card-edit-btn:hover { color: var(--color-text); }
+    .teacher-card-edit-btn svg { width: 16px; height: 16px; }
+    .teacher-card-title-row { display: flex; align-items: center; gap: 12px; }
+    .teacher-card-icon {
+      position: relative;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+    }
+    .teacher-card-icon::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background-color: currentColor;
+      opacity: 0.16;
+    }
+    .teacher-card-icon svg { position: relative; width: 20px; height: 20px; }
+    .teacher-card-title { color: var(--color-text); font-size: var(--fs-chip); font-weight: 600; line-height: 1.3; }
+    .teacher-card-chevron {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      margin-left: auto;
+      color: var(--color-text-secondary);
+      transition: transform var(--dur) var(--ease-out);
+    }
+    .teacher-card.expanded .teacher-card-chevron { transform: rotate(180deg); }
+    .teacher-card-details {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-separator);
+      font-size: var(--fs-caption);
+    }
+    .teacher-card.expanded .teacher-card-details { display: block; }
+    .teacher-card-details > div { margin-bottom: 4px; }
+
+    /* ===== Телефоны (360–430px) ===== */
+    @media (max-width: 576px) {
+      .container { padding-left: 16px; padding-right: 16px; }
+      .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .stat-card { padding: 10px; min-height: 68px; }
+      .stat-value { font-size: 19px; }
+      .stat-label { font-size: 10px; }
+      /* Кнопки администратора — сетка 2×3, ничего не прячется и не прокручивается */
+      .action-buttons-group { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+      .action-buttons-group .btn,
+      .action-buttons-group .dropdown > .btn { width: 100%; min-height: 40px; }
+    }
+    @media (max-width: 370px) {
+      .student-name { font-size: 16px; }
+      .students-list-header { font-size: var(--fs-small); }
+      .students-list-header .col-hours-labels,
+      .student-row .col-hours-values { gap: 16px; }
+    }
+    /* Цифры и «ч» в истории студента не разрываем по строкам */
+    #studentHistoryModal strong { white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<div class="container my-3">
+  
+  <!-- Заголовок страницы -->
+  <header class="app-header va-header">
+    <div id="headerTapArea" class="app-header-main">
+      <div class="app-title-row">
+        <h2 class="app-title" id="appTitle">Журнал</h2>
+        <span class="group-badge">24ДММ-2</span>
+      </div>
+      <div class="app-subtitle" id="dataLastUpdated"></div>
+    </div>
+    <div class="hdr-actions">
+      <button type="button" class="va-bell" id="announcementsBell" onclick="openAnnouncementsSheet()" aria-label="Объявления">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.2v1.3"/><path d="M6.2 16.6V11a5.8 5.8 0 0 1 11.6 0v5.6l1.6 1.7H4.6z"/><path d="M9.9 20.6a2.3 2.3 0 0 0 4.2 0"/></svg>
+        <span class="va-bell-count d-none" id="announcementsBellCount">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Объявления — лист снизу по колокольчику -->
+  <div class="modal fade" id="announcementsSheet" tabindex="-1" aria-labelledby="announcementsSheetTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="announcementsSheetTitle">Объявления</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <div id="generalAnnouncementsSection" class="mb-4 d-none">
+    <div id="generalAnnouncementsList"></div>
+  </div>
+          <div class="va-empty" id="announcementsEmpty">Объявлений пока нет</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Раздел «Статистика» (index.html#stats) -->
+  <div id="viewStats" class="app-view">
+
+  <!-- Карточки метрик (только для администратора) -->
+  <div class="stats-grid mb-4 admin-only d-none">
+    <div class="stat-card">
+      <div class="stat-value" id="statTotalStudents">0</div>
+      <div class="stat-label">Всего студентов</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statBudget">0</div>
+      <div class="stat-label">Бюджет</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statPaid">0</div>
+      <div class="stat-label">Платники</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-warning" id="statUnexcusedHours">0</div>
+      <div class="stat-label">Неуваж. часов</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-success" id="statExcusedHours">0</div>
+      <div class="stat-label">Уваж. часов</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-danger" id="statRedZone">0</div>
+      <div class="stat-label">Вероятное предупреждение от деканата (14+)</div>
+    </div>
+  </div>
+
+  <!-- Панель действий -->
+  <div class="mb-4">
+    <input type="text" id="searchInput" class="form-control form-control-sm mb-2" placeholder="Поиск по ФИО..." oninput="renderTable()">
+
+    <div class="toolbar-row">
+      <div class="toolbar-main">
+        <button type="button" class="filter-toggle-btn" onclick="openFilterModal()" id="filterToggleBtn">
+          <svg viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><path d="M5.72052 2.87842C7.11775 3.0204 8.20862 4.2006 8.2088 5.63525L8.19415 5.91846C8.05221 7.31575 6.87202 8.40658 5.43732 8.40674L5.15411 8.39209C3.95514 8.27049 2.98458 7.38436 2.73224 6.229H1.87384C1.54595 6.22891 1.28009 5.96317 1.28009 5.63525C1.28038 5.30758 1.54612 5.04159 1.87384 5.0415H2.73126C3.00338 3.7966 4.11084 2.86377 5.43732 2.86377L5.72052 2.87842ZM5.43732 4.05127C4.56285 4.05127 3.85352 4.76083 3.85333 5.63525C3.85345 6.50974 4.56281 7.21826 5.43732 7.21826C6.31168 7.21809 7.0202 6.50963 7.02032 5.63525C7.02013 4.76094 6.31164 4.05144 5.43732 4.05127ZM16.1258 5.0415C16.4536 5.0415 16.7193 5.30753 16.7195 5.63525C16.7195 5.96322 16.4538 6.229 16.1258 6.229H8.53888C8.58062 6.03775 8.60431 5.83902 8.60431 5.63525C8.60428 5.43145 8.58067 5.23278 8.53888 5.0415H16.1258Z"/><path d="M12.2795 9.60864C10.8822 9.75066 9.79126 10.9307 9.79126 12.3655L9.80591 12.6487C9.94788 14.0459 11.1281 15.1368 12.5627 15.137L12.8459 15.1223C14.0448 15.0007 15.0153 14.1144 15.2678 12.9592H16.1262C16.454 12.9591 16.7198 12.6932 16.72 12.3655C16.72 12.0376 16.4541 11.7718 16.1262 11.7717H15.2688C14.9968 10.5266 13.8894 9.59399 12.5627 9.59399L12.2795 9.60864ZM12.5627 10.7815C13.4373 10.7815 14.1467 11.4909 14.1467 12.3655C14.1466 13.2399 13.4372 13.9485 12.5627 13.9485C11.6884 13.9483 10.9799 13.2398 10.9797 12.3655C10.9797 11.491 11.6883 10.7817 12.5627 10.7815ZM1.87427 11.7717C1.5463 11.7717 1.28052 12.0375 1.28052 12.3655C1.28071 12.6933 1.54642 12.9592 1.87427 12.9592H9.46118C9.41937 12.7679 9.39578 12.5693 9.39575 12.3655C9.39575 12.1617 9.41944 11.963 9.46118 11.7717H1.87427Z"/></svg>
+          Фильтр
+          <svg class="chevron" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5l5 5 5-5"/></svg>
+        </button>
+        <button type="button" class="sort-icon-btn" onclick="openSortSheet()" aria-haspopup="dialog" title="Сортировка" aria-label="Сортировка">
+          <svg viewBox="0 0 22 22" fill="currentColor" aria-hidden="true"><path d="M3 6.66667C3 6.35725 3.12292 6.0605 3.34171 5.84171C3.5605 5.62292 3.85725 5.5 4.16667 5.5H15.8333C16.1428 5.5 16.4395 5.62292 16.6583 5.84171C16.8771 6.0605 17 6.35725 17 6.66667C17 6.97609 16.8771 7.27283 16.6583 7.49162C16.4395 7.71042 16.1428 7.83333 15.8333 7.83333H4.16667C3.85725 7.83333 3.5605 7.71042 3.34171 7.49162C3.12292 7.27283 3 6.97609 3 6.66667ZM5.33333 11.3333C5.33333 11.0239 5.45625 10.7272 5.67504 10.5084C5.89383 10.2896 6.19058 10.1667 6.5 10.1667H13.5C13.8094 10.1667 14.1062 10.2896 14.325 10.5084C14.5437 10.7272 14.6667 11.0239 14.6667 11.3333C14.6667 11.6428 14.5437 11.9395 14.325 12.1583C14.1062 12.3771 13.8094 12.5 13.5 12.5H6.5C6.19058 12.5 5.89383 12.3771 5.67504 12.1583C5.45625 11.9395 5.33333 11.6428 5.33333 11.3333ZM8.83333 14.8333C8.52391 14.8333 8.22717 14.9563 8.00838 15.175C7.78958 15.3938 7.66667 15.6906 7.66667 16C7.66667 16.3094 7.78958 16.6062 8.00838 16.825C8.22717 17.0438 8.52391 17.1667 8.83333 17.1667H11.1667C11.4761 17.1667 11.7728 17.0438 11.9916 16.825C12.2104 16.6062 12.3333 16.3094 12.3333 16C12.3333 15.6906 12.2104 15.3938 11.9916 15.175C11.7728 14.9563 11.4761 14.8333 11.1667 14.8333H8.83333Z"/></svg>
+        </button>
+      </div>
+
+      <div class="action-buttons-group admin-only d-none gap-2 flex-wrap">
+        <button class="btn btn-primary btn-sm fw-bold admin-only d-none" onclick="openAddAbsenceModal()">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
+          Внести пропуски
+        </button>
+        <button class="btn btn-outline-light btn-sm admin-only d-none" onclick="openGroupAbsenceModal()">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Пропуски группой
+        </button>
+        <button class="btn btn-outline-light btn-sm admin-only d-none" onclick="openAddStudentModal()">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+          Добавить студента
+        </button>
+        <button class="btn btn-outline-light btn-sm admin-only d-none" onclick="openAnnouncementModal()">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v3a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          Объявление
+        </button>
+        <button class="btn btn-outline-light btn-sm admin-only d-none" onclick="openDeadlinesModal()">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>
+          Дедлайны
+        </button>
+        <button class="btn btn-outline-light btn-sm admin-only d-none" onclick="generateDeanReport()">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M12 11v8"/></svg>
+          Отчёт для деканата
+        </button>
+        <div class="dropdown admin-only d-none">
+          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+            Ещё
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="#" onclick="exportToCSV(); return false;">Выгрузить CSV</a></li>
+            <li><a class="dropdown-item" href="#" onclick="downloadBackup(); return false;">Резервная копия</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Скрытые select-ы — реальное хранилище значений фильтра, читается остальным кодом как раньше.
+         Видимый UI теперь — filterModal (открывается кнопкой "Фильтр"). -->
+    <div style="display: none;">
+      <select id="typeFilter" onchange="renderTable()">
+        <option value="ALL">Все</option>
+        <option value="Бюджет">Бюджет</option>
+        <option value="Платное">Платники</option>
+      </select>
+      <select id="periodFilter" onchange="renderTable()">
+        <option value="ALL">Всё время</option>
+        <option value="WEEK">Неделя</option>
+        <option value="MONTH">Месяц</option>
+        <option value="SEMESTER">Семестр</option>
+      </select>
+      <select id="subjectFilter" onchange="renderTable()">
+        <option value="ALL">Все предметы</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Расширенная статистика по группе (только для администратора) -->
+  <div class="mb-4 admin-only d-none">
+    <h6 class="text-white mb-2">Расширенная статистика</h6>
+    <div class="row g-2">
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-value" id="extStatAvgHours">0</div>
+          <div class="stat-label">Среднее неуваж. часов на студента</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-value" style="font-size: 15px; line-height: 1.3;" id="extStatWorstSubject">—</div>
+          <div class="stat-label">Самый пропускаемый предмет</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-value text-danger" id="extStatOverdueCerts">0</div>
+          <div class="stat-label">Просрочено справок</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-value text-success" id="extStatPerfect">0</div>
+          <div class="stat-label">Студентов без пропусков</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Аналитика по группе (только для администратора) -->
+  <div class="mb-4 admin-only d-none">
+    <h6 class="text-white mb-2">Аналитика за семестр по предметам</h6>
+    <div class="table-container" style="padding: 14px;">
+      <div class="analytics-chart-wrap"><canvas id="analyticsChart" aria-label="Неуважительные часы по предметам за семестр" role="img"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Таблица/список студентов -->
+  <div class="students-list-container mb-4">
+    <div class="students-list-header">
+      <span class="col-num">№</span>
+      <span class="col-name d-none d-sm-inline">ФИО</span>
+      <span class="col-hours-labels">
+        <span>НЕУВАЖ</span>
+        <span>УВАЖ</span>
+      </span>
+    </div>
+    <div id="studentsTableBody" aria-busy="true">
+      <!-- Скелетоны, пока грузится data.json (renderTable заменит их списком) -->
+      <div class="student-row skeleton-row" aria-hidden="true"><span class="skel skel-num"></span><span class="skel skel-name"></span><span class="skel skel-circle"></span></div>
+      <div class="student-row skeleton-row" aria-hidden="true"><span class="skel skel-num"></span><span class="skel skel-name"></span><span class="skel skel-circle"></span></div>
+      <div class="student-row skeleton-row" aria-hidden="true"><span class="skel skel-num"></span><span class="skel skel-name"></span><span class="skel skel-circle"></span></div>
+      <div class="student-row skeleton-row" aria-hidden="true"><span class="skel skel-num"></span><span class="skel skel-name"></span><span class="skel skel-circle"></span></div>
+      <div class="student-row skeleton-row" aria-hidden="true"><span class="skel skel-num"></span><span class="skel skel-name"></span><span class="skel skel-circle"></span></div>
+      <div class="student-row skeleton-row" aria-hidden="true"><span class="skel skel-num"></span><span class="skel skel-name"></span><span class="skel skel-circle"></span></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Раздел «Преподаватели» (index.html#teachers) — раньше было окно teachersModal -->
+  <section id="viewTeachers" class="app-view d-none" aria-labelledby="teachersViewTitle">
+    <h3 class="view-title" id="teachersViewTitle">Преподавательский состав</h3>
+    <div id="teachersList"></div>
+    <button type="button" class="btn btn-outline-light btn-sm admin-only d-none mt-2" onclick="openAddTeacherModal()">+ Добавить преподавателя</button>
+  </section>
+
+  <!-- Раздел «Дедлайны» (index.html#deadlines): календарь и список; код — shared.js -->
+  <section id="viewDeadlines" class="app-view d-none" aria-labelledby="deadlinesViewTitle">
+    <div class="view-head">
+      <h3 class="view-title" id="deadlinesViewTitle">Дедлайны и зачёты</h3>
+      <button type="button" class="btn btn-outline-light btn-sm admin-only d-none" onclick="openDeadlinesModal()">Управлять</button>
+    </div>
+    <div class="cal dl-cal">
+      <div class="cal-head">
+        <button type="button" class="cal-nav" onclick="shiftDeadlineCalendarMonth(-1)" aria-label="Предыдущий месяц">‹</button>
+        <b id="dlCalendarTitle">—</b>
+        <button type="button" class="cal-nav" onclick="shiftDeadlineCalendarMonth(1)" aria-label="Следующий месяц">›</button>
+      </div>
+      <div class="cal-grid" id="dlCalendarGrid"></div>
+      <div class="cal-legend"><span><i class="m-dl"></i>дедлайн</span><span><i class="m-zachet"></i>зачёт</span></div>
+    </div>
+    <div class="cap" id="dlCalendarDayTitle"></div>
+    <div id="dlCalendarDayList"></div>
+
+    <div class="kicker mt-4">Дедлайны и зачёты группы</div>
+    <div id="deadlinesList"></div>
+    <div id="deadlinesEmpty" class="dl-empty d-none">Дедлайнов пока нет</div>
+    <details class="dl-past d-none" id="deadlinesPast">
+      <summary>Прошедшие <span id="deadlinesPastCount"></span></summary>
+      <div id="deadlinesPastList"></div>
+    </details>
+  </section>
+</div>
+
+<!-- Модальное окно: Внести пропуски -->
+<div class="modal fade" id="addAbsenceModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white">Внести пропуски</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Студент</label>
+          <select id="absenceStudent" class="form-select" onchange="updateStudentSummaryCard()"></select>
+        </div>
+
+        <!-- Сводка по выбранному студенту -->
+        <div class="student-summary-card mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small text-secondary">ФИО</div>
+              <div class="fw-bold text-white" id="modalStudentNameSummary">—</div>
+            </div>
+            <div class="text-end">
+              <div class="small text-secondary">Неуваж. часов за месяц</div>
+              <div class="fw-bold text-warning" id="modalStudentHoursSummary">0 часов</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Часы за этот день</label>
+          <div class="d-flex gap-2 mb-2">
+            <button type="button" class="btn btn-outline-secondary quick-hour-btn" onclick="setQuickHours(2)">2</button>
+            <button type="button" class="btn btn-outline-secondary quick-hour-btn" onclick="setQuickHours(4)">4</button>
+            <button type="button" class="btn btn-outline-secondary quick-hour-btn" onclick="setQuickHours(6)">6</button>
+            <button type="button" class="btn btn-outline-secondary quick-hour-btn" onclick="setQuickHours(8)">8</button>
+          </div>
+          <input type="number" id="absenceHours" class="form-control" placeholder="Своё количество часов" min="1" value="2" oninput="renderSubjectPickers()">
+        </div>
+
+        <!-- Один список предметов (чекбоксы) -->
+        <div class="mb-3">
+          <div id="subjectContainer"></div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Дата</label>
+          <input type="date" id="absenceDate" class="form-control" oninput="updateAbsenceDateCaption()">
+          <div class="small text-secondary mt-1" id="absenceDateCaption"></div>
+        </div>
+
+        <div class="mb-3 form-check">
+          <input type="checkbox" id="absenceIsExcused" class="form-check-input" onchange="toggleCertFields()">
+          <label class="form-check-label text-secondary small" for="absenceIsExcused">Уважительный пропуск</label>
+        </div>
+
+        <div id="certFieldsContainer" class="subject-slot-card mb-3 d-none">
+          <label class="form-label text-secondary small fw-bold mb-2">Справка</label>
+          <div class="mb-2">
+            <select id="absenceCertType" class="form-select form-select-sm">
+              <option value="Больничный">Больничный</option>
+              <option value="Заявление">Заявление</option>
+              <option value="Освобождение">Освобождение</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label text-secondary small">Срок сдачи справки</label>
+            <input type="date" id="absenceCertDueDate" class="form-control form-control-sm">
+          </div>
+          <div class="form-check">
+            <input type="checkbox" id="absenceCertSubmitted" class="form-check-input">
+            <label class="form-check-label text-secondary small" for="absenceCertSubmitted">Справка уже сдана</label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Примечание (необязательно)</label>
+          <input type="text" id="absenceComment" class="form-control" placeholder="Например: По болезни">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-primary fw-bold" onclick="submitAbsence()">Ввести</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: Внести пропуски группой (один предмет/день — сразу нескольким студентам) -->
+<div class="modal fade" id="groupAbsenceModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white">Внести пропуски группой</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-secondary mb-3">Один предмет и одна дата — сразу для нескольких студентов (например, вся подгруппа пропустила пару).</p>
+
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Предмет</label>
+          <select id="groupAbsenceSubject" class="form-select"></select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Дата</label>
+          <input type="date" id="groupAbsenceDate" class="form-control">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Часы (одинаковые для всех выбранных)</label>
+          <div class="d-flex gap-2 mb-2">
+            <button type="button" class="btn btn-outline-secondary quick-hour-btn" onclick="setGroupQuickHours(2)">2</button>
+            <button type="button" class="btn btn-outline-secondary quick-hour-btn" onclick="setGroupQuickHours(4)">4</button>
+            <button type="button" class="btn btn-outline-secondary quick-hour-btn" onclick="setGroupQuickHours(6)">6</button>
+            <button type="button" class="btn btn-outline-secondary quick-hour-btn" onclick="setGroupQuickHours(8)">8</button>
+          </div>
+          <input type="number" id="groupAbsenceHours" class="form-control" placeholder="Своё количество часов" min="1" value="2">
+        </div>
+
+        <div class="mb-3 form-check">
+          <input type="checkbox" id="groupAbsenceIsExcused" class="form-check-input" onchange="toggleGroupCertFields()">
+          <label class="form-check-label text-secondary small" for="groupAbsenceIsExcused">Уважительный пропуск</label>
+        </div>
+
+        <div id="groupCertFieldsContainer" class="subject-slot-card mb-3 d-none">
+          <label class="form-label text-secondary small fw-bold mb-2">Справка</label>
+          <div class="mb-2">
+            <select id="groupCertType" class="form-select form-select-sm">
+              <option value="Больничный">Больничный</option>
+              <option value="Заявление">Заявление</option>
+              <option value="Освобождение">Освобождение</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label text-secondary small">Срок сдачи справки</label>
+            <input type="date" id="groupCertDueDate" class="form-control form-control-sm">
+          </div>
+          <div class="form-check">
+            <input type="checkbox" id="groupCertSubmitted" class="form-check-input">
+            <label class="form-check-label text-secondary small" for="groupCertSubmitted">Справка уже сдана</label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Примечание (необязательно, общее для всех)</label>
+          <input type="text" id="groupAbsenceComment" class="form-control" placeholder="Например: Выезд на конференцию">
+        </div>
+
+        <div class="mb-2 d-flex justify-content-between align-items-center">
+          <label class="form-label text-secondary small m-0">Студенты</label>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setAllGroupStudents(true)">Все</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setAllGroupStudents(false)">Никто</button>
+          </div>
+        </div>
+        <input type="text" id="groupStudentSearch" class="form-control form-control-sm mb-2" placeholder="Поиск по ФИО..." oninput="renderGroupStudentsList()">
+        <div id="groupStudentsList" class="subject-slot-card" style="max-height: 260px; overflow-y: auto;"></div>
+        <div class="small text-secondary mt-2">Выбрано: <span id="groupSelectedCount">0</span></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-primary fw-bold" onclick="submitGroupAbsence()">Внести всем выбранным</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: Добавить / Редактировать студента -->
+<div class="modal fade" id="studentEditModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white" id="studentEditTitle">Добавить студента</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editStudentId">
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Фамилия</label>
+          <input type="text" id="studentLastName" class="form-control" placeholder="Иванов" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Имя и Отчество</label>
+          <input type="text" id="studentFirstName" class="form-control" placeholder="Иван Иванович" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Форма обучения</label>
+          <select id="studentStatus" class="form-select">
+            <option value="Бюджет">Бюджет</option>
+            <option value="Платное">Платник</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Роль (необязательно)</label>
+          <input type="text" id="studentRole" class="form-control" placeholder="Староста, Зам. старосты...">
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Telegram username (без @, необязательно)</label>
+          <input type="text" id="studentTelegramUsername" class="form-control" placeholder="username">
+        </div>
+        <div class="form-check mb-3">
+          <input type="checkbox" id="studentIsAdmin" class="form-check-input">
+          <label class="form-check-label text-secondary small" for="studentIsAdmin">Администратор журнала</label>
+        </div>
+
+        <div id="studentAbsenceManageSection" class="d-none">
+          <hr class="border-secondary">
+          <label class="form-label text-secondary small fw-bold">Удалить пропуски студента</label>
+
+          <div class="d-flex gap-2 mb-2">
+            <select id="deleteAbsByDateSelect" class="form-select form-select-sm"></select>
+            <button type="button" class="btn btn-outline-danger btn-sm text-nowrap" onclick="deleteAbsencesByDate()">За день</button>
+          </div>
+
+          <div class="d-flex gap-2">
+            <select id="deleteAbsBySubjectSelect" class="form-select form-select-sm"></select>
+            <button type="button" class="btn btn-outline-danger btn-sm text-nowrap" onclick="deleteAbsencesBySubject()">По предмету</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-success fw-bold" onclick="saveStudent()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: История и подробная статистика студента -->
+<div class="modal fade" id="studentHistoryModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white" id="historyModalTitle">История пропусков</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Сводка статистики -->
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <div class="p-3 border rounded border-secondary border-opacity-25 bg-dark">
+              <div class="text-secondary small mb-1">За текущий месяц</div>
+              <div class="d-flex justify-content-between">
+                <span>Неуважительные: <strong class="text-warning" id="historyMonthUnexcused">0 ч</strong></span>
+                <span>Уважительные: <strong class="text-success" id="historyMonthExcused">0 ч</strong></span>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 border rounded border-secondary border-opacity-25 bg-dark">
+              <div class="text-secondary small mb-1">За весь семестр</div>
+              <div class="d-flex justify-content-between">
+                <span>Неуважительные: <strong class="text-danger" id="historyTotalUnexcused">0 ч</strong></span>
+                <span>Уважительные: <strong class="text-success" id="historyTotalExcused">0 ч</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Для администратора — подробная статистика прямо здесь: предметы, все записи, справки -->
+        <div class="admin-only d-none" id="historyAdminDetails">
+          <h6 class="text-white mb-2">Пропуски по предметам</h6>
+          <div class="table-responsive mb-4">
+            <table class="table table-bordered table-sm align-middle text-center">
+              <thead>
+                <tr class="table-dark">
+                  <th class="text-start">Предмет</th>
+                  <th>Неуваж. (ч)</th>
+                  <th>Уваж. (ч)</th>
+                  <th>Всего (ч)</th>
+                </tr>
+              </thead>
+              <tbody id="detailedStatsSubjectBody"></tbody>
+            </table>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+            <h6 class="text-white m-0">Все записи пропусков</h6>
+            <button type="button" class="btn btn-sm btn-outline-primary d-none" id="certConfirmAllBtn" onclick="confirmAllCerts()">Подтвердить все справки</button>
+          </div>
+          <div class="list-group list-group-flush border rounded border-secondary border-opacity-25" id="detailedStatsList"></div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary admin-only d-none" onclick="editCurrentHistoryStudent()">Изменить</button>
+        <button type="button" class="btn btn-outline-danger admin-only d-none" onclick="deleteCurrentHistoryStudent()">Удалить</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: Добавить / редактировать преподавателей предмета -->
+<div class="modal fade" id="teacherEditModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white" id="teacherEditTitle">Добавить предмет</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editTeacherId">
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Предмет</label>
+          <select id="teacherSubject" class="form-select"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Преподаватель (Лекции)</label>
+          <input type="text" id="teacherLecture" class="form-control" placeholder="ФИО">
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Преподаватель (Практические занятия)</label>
+          <input type="text" id="teacherPractice" class="form-control" placeholder="ФИО">
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Преподаватель (Лабораторные занятия)</label>
+          <input type="text" id="teacherLab" class="form-control" placeholder="ФИО (можно с подгруппами)">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-danger me-auto" id="teacherDeleteBtn" onclick="deleteTeacher()" style="display:none;">Удалить</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-success fw-bold" onclick="saveTeacher()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: Разместить объявление -->
+<!-- Модальное окно: Дедлайны (админ) -->
+<div class="modal fade" id="deadlinesModal" tabindex="-1" aria-labelledby="deadlinesModalTitle">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white" id="deadlinesModalTitle">Дедлайны и зачёты</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <button type="button" class="btn btn-primary w-100 fw-bold mb-3" onclick="openDeadlineForm()">+ Добавить дедлайн или зачёт</button>
+        <div id="deadlinesAdminList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: Добавить / изменить дедлайн -->
+<div class="modal fade" id="deadlineFormModal" tabindex="-1" aria-labelledby="deadlineFormTitle">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white" id="deadlineFormTitle">Новый дедлайн</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <div class="btn-group w-100 mb-3" role="group" aria-label="Тип записи">
+          <input type="radio" class="btn-check" name="deadlineType" id="deadlineTypeDeadline" value="deadline" autocomplete="off" checked onchange="updateDeadlineFormType()">
+          <label class="btn btn-outline-secondary" for="deadlineTypeDeadline">Дедлайн</label>
+          <input type="radio" class="btn-check" name="deadlineType" id="deadlineTypeZachet" value="zachet" autocomplete="off" onchange="updateDeadlineFormType()">
+          <label class="btn btn-outline-secondary" for="deadlineTypeZachet">Зачёт</label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small" for="deadlineSubject">Предмет</label>
+          <select id="deadlineSubject" class="form-select"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small" for="deadlineText" id="deadlineTextLabel">Что нужно сделать</label>
+          <textarea id="deadlineText" class="form-control" rows="4" placeholder="Например: сдать презентацию по модели 4P"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small" for="deadlineDueDate" id="deadlineDueDateLabel">Срок</label>
+          <input type="date" id="deadlineDueDate" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" onclick="closeDeadlineForm()">Отмена</button>
+        <button type="button" class="btn btn-primary fw-bold" id="deadlineSaveBtn" onclick="saveDeadline()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="announcementModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white">Разместить объявление</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Текст объявления</label>
+          <textarea id="announcementText" class="form-control" rows="4" placeholder="Например: Зачёт по логистике переносится на..."></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small">Кому показать</label>
+          <select id="announcementTarget" class="form-select" onchange="toggleAnnouncementStudentSelect()">
+            <option value="ALL">Всей группе</option>
+            <option value="STUDENT">Конкретному студенту</option>
+          </select>
+        </div>
+        <div class="mb-3 d-none" id="announcementStudentSelectWrap">
+          <label class="form-label text-secondary small">Студент</label>
+          <select id="announcementStudent" class="form-select"></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-primary fw-bold" onclick="saveAnnouncement()">Опубликовать</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: Фильтры (полноэкранный лист в стиле Figma) -->
+<div class="modal fade swipe-sheet" id="filterModal" tabindex="-1" aria-labelledby="filterSheetTitle">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content filter-sheet">
+      <!-- Потянуть вниз за ручку или заголовок — закрыть -->
+      <div class="sheet-drag">
+        <div class="filter-sheet-handle" aria-hidden="true"></div>
+        <div class="filter-sheet-header">
+          <div class="filter-sheet-title" id="filterSheetTitle">Фильтры</div>
+        </div>
+      </div>
+      <button type="button" class="visually-hidden-focusable sheet-close" data-bs-dismiss="modal">Закрыть</button>
+      <div class="filter-sheet-body">
+        <div class="filter-section">
+          <div class="filter-section-title">Форма обучения</div>
+          <div class="filter-chip-row" id="filterChipsType">
+            <button type="button" class="filter-chip" data-value="ALL" onclick="selectFilterChip('typeFilter','ALL','filterChipsType',this)">
+              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+              <span>Все</span>
+            </button>
+            <button type="button" class="filter-chip" data-value="Платное" onclick="selectFilterChip('typeFilter','Платное','filterChipsType',this)">
+              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+              <span>Платник</span>
+            </button>
+            <button type="button" class="filter-chip" data-value="Бюджет" onclick="selectFilterChip('typeFilter','Бюджет','filterChipsType',this)">
+              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+              <span>Бюджет</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-section-title">Период</div>
+          <div class="filter-chip-row" id="filterChipsPeriod">
+            <button type="button" class="filter-chip" data-value="ALL" onclick="selectFilterChip('periodFilter','ALL','filterChipsPeriod',this)">
+              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+              <span>Всё время</span>
+            </button>
+            <button type="button" class="filter-chip" data-value="WEEK" onclick="selectFilterChip('periodFilter','WEEK','filterChipsPeriod',this)">
+              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+              <span>Неделя</span>
+            </button>
+            <button type="button" class="filter-chip" data-value="MONTH" onclick="selectFilterChip('periodFilter','MONTH','filterChipsPeriod',this)">
+              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+              <span>Месяц</span>
+            </button>
+            <button type="button" class="filter-chip" data-value="SEMESTER" onclick="selectFilterChip('periodFilter','SEMESTER','filterChipsPeriod',this)">
+              <span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+              <span>Семестр</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-section-title">Предмет</div>
+          <div class="filter-chip-row" id="filterChipsSubject"></div>
+        </div>
+      </div>
+      <div class="filter-sheet-footer">
+        <button type="button" class="filter-sheet-apply" data-bs-dismiss="modal">Поиск</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Сортировка — лист снизу (пункты и setSort прежние) -->
+<div class="modal fade swipe-sheet" id="sortSheet" tabindex="-1" aria-labelledby="sortSheetTitle">
+  <div class="modal-dialog">
+    <div class="modal-content filter-sheet">
+      <div class="sheet-drag">
+        <div class="filter-sheet-handle" aria-hidden="true"></div>
+        <div class="filter-sheet-header">
+          <div class="filter-sheet-title" id="sortSheetTitle">Сортировать по</div>
+        </div>
+      </div>
+      <button type="button" class="visually-hidden-focusable sheet-close" data-bs-dismiss="modal">Закрыть</button>
+      <div class="sort-sheet-body" id="sortDropdownMenu">
+        <a href="#" class="sort-dropdown-item" data-sort-key="number" onclick="setSort('number'); return false;">
+          <span class="check-icon"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+          <span>По номеру</span>
+        </a>
+        <hr class="sort-divider">
+        <a href="#" class="sort-dropdown-item" data-sort-key="name" onclick="setSort('name'); return false;">
+          <span class="check-icon"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+          <span>По ФИО</span>
+        </a>
+        <hr class="sort-divider">
+        <a href="#" class="sort-dropdown-item" data-sort-key="unexcused" onclick="setSort('unexcused'); return false;">
+          <span class="check-icon"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+          <span>По неуважительным</span>
+        </a>
+        <hr class="sort-divider">
+        <a href="#" class="sort-dropdown-item" data-sort-key="excused" onclick="setSort('excused'); return false;">
+          <span class="check-icon"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span>
+          <span>По уважительным</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Замена стандартного showAlert() -->
+<div class="modal fade" id="customAlertModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body py-4 text-center">
+        <div id="customAlertMessage" class="text-white"></div>
+      </div>
+      <div class="modal-footer border-0 justify-content-center pt-0">
+        <button type="button" class="btn btn-primary fw-bold px-4" data-bs-dismiss="modal">Ок</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Замена стандартного confirm() -->
+<div class="modal fade" id="customConfirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body py-4 text-center">
+        <div id="customConfirmMessage" class="text-white"></div>
+      </div>
+      <div class="modal-footer border-0 justify-content-center pt-0">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-danger fw-bold px-4" id="customConfirmOkBtn">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Что нового -->
+<div class="modal fade" id="whatsNewModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-white">Что нового</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-secondary mb-2" id="whatsNewDate"></div>
+        <ul class="text-white ps-3 mb-0" id="whatsNewList"></ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary fw-bold w-100" data-bs-dismiss="modal">Понятно</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+<script src="shared.js?v=11"></script>
+<script>
+  const GITHUB_OWNER = 'dimpolenyshev';
+  const GITHUB_REPO = 'student-journal';
+  const DATA_PATH = 'data.json';
+
+  const DEFAULT_SUBJECTS = [
+    "Интегрированные маркетинговые коммуникации",
+    "Кураторский час",
+    "Логистика",
+    "Маркетинг инноваций",
+    "Маркетинг услуг",
+    "Маркетинговые исследования и аналитика",
+    "Стратегический маркетинг",
+    "Физическая культура",
+    "Функционально-стоимостный анализ",
+    "Эконометрика"
+  ];
+
+  // Формат дд.мм.гг для дат в интерфейсе (принимает 'YYYY-MM-DD' или Date)
+  function formatDateShort(dateInput) {
+    const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (isNaN(d.getTime())) return String(dateInput || '—');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${dd}.${mm}.${yy}`;
+  }
+
+  let appData = { subjects: DEFAULT_SUBJECTS, students: [], absences: [] };
+  let githubToken = localStorage.getItem('gh_pat') || '';
+  let currentHistoryStudentId = null;
+
+  const addAbsenceModal = new bootstrap.Modal(document.getElementById('addAbsenceModal'));
+  const groupAbsenceModal = new bootstrap.Modal(document.getElementById('groupAbsenceModal'));
+  const studentEditModal = new bootstrap.Modal(document.getElementById('studentEditModal'));
+  const studentHistoryModal = new bootstrap.Modal(document.getElementById('studentHistoryModal'));
+  const teacherEditModal = new bootstrap.Modal(document.getElementById('teacherEditModal'));
+  const announcementModal = new bootstrap.Modal(document.getElementById('announcementModal'));
+  const filterModal = new bootstrap.Modal(document.getElementById('filterModal'));
+  const sortSheet = new bootstrap.Modal(document.getElementById('sortSheet'));
+  function openSortSheet() {
+    updateSortIndicators();
+    sortSheet.show();
+  }
+  // Выбрали пункт — галочка успевает «выпрыгнуть», и лист закрывается
+  document.getElementById('sortSheet').addEventListener('click', (e) => {
+    if (e.target.closest('.sort-dropdown-item')) setTimeout(() => sortSheet.hide(), 180);
+  });
+
+  // Листы снизу (.swipe-sheet): тянем за ручку или заголовок — лист едет за пальцем, затемнение бледнеет.
+  // Отпустили ниже 30% высоты или резко смахнули — закрываем, иначе лист возвращается на место.
+  // Ещё закрываются тапом по затемнению, Esc и скрытой кнопкой «Закрыть» (штатно в Bootstrap).
+  function enableSheetSwipe(modalEl) {
+    const dialog = modalEl.querySelector('.modal-dialog');
+    const content = modalEl.querySelector('.modal-content');
+    let drag = null;
+    const backdrop = () => document.querySelector('.modal-backdrop.show');
+    const reset = () => {
+      dialog.style.transition = '';
+      dialog.style.transform = '';
+      const bd = backdrop(); if (bd) { bd.style.transition = ''; bd.style.opacity = ''; }
+    };
+    modalEl.querySelectorAll('.sheet-drag').forEach(zone => {
+      zone.addEventListener('pointerdown', (e) => {
+        if (e.button > 0 || !modalEl.classList.contains('show')) return;
+        drag = { id: e.pointerId, startY: e.clientY, lastY: e.clientY, lastT: e.timeStamp, dy: 0, v: 0, h: content.offsetHeight || 1 };
+        try { zone.setPointerCapture(e.pointerId); } catch (err) {}
+        dialog.style.transition = 'none';
+        const bd = backdrop(); if (bd) bd.style.transition = 'none';
+      });
+      zone.addEventListener('pointermove', (e) => {
+        if (!drag || e.pointerId !== drag.id) return;
+        const dt = e.timeStamp - drag.lastT;
+        if (dt > 0) drag.v = (e.clientY - drag.lastY) / dt;          // px/мс, вниз — положительная
+        drag.lastY = e.clientY; drag.lastT = e.timeStamp;
+        drag.dy = Math.max(0, e.clientY - drag.startY);
+        dialog.style.transform = `translateY(${drag.dy}px)`;
+        const bd = backdrop(); if (bd) bd.style.opacity = String(0.6 * Math.max(0, 1 - drag.dy / drag.h));
+      });
+      const end = (e) => {
+        if (!drag || e.pointerId !== drag.id) return;
+        const { dy, v, h } = drag;
+        drag = null;
+        const close = dy > h * 0.3 || (v > 0.5 && dy > 12);
+        dialog.style.transition = 'transform var(--dur-slow) var(--ease-sheet)';
+        const bd = backdrop(); if (bd) bd.style.transition = '';
+        if (close) {
+          dialog.style.transform = `translateY(${h + 40}px)`;
+          haptic('impact');
+          bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        } else {
+          dialog.style.transform = '';
+          if (bd) bd.style.opacity = '';
+        }
+      };
+      zone.addEventListener('pointerup', end);
+      zone.addEventListener('pointercancel', end);
+    });
+    modalEl.addEventListener('hidden.bs.modal', reset);
+    modalEl.addEventListener('show.bs.modal', reset);
+  }
+  document.querySelectorAll('.modal.swipe-sheet').forEach(enableSheetSwipe);
+  document.getElementById('filterModal').addEventListener('hide.bs.modal', () => {
+    if (!filtersChangedInSheet) return;
+    filtersChangedInSheet = false;
+    animateRowsNext = true;
+    renderTable();
+  });
+  const customAlertModal = new bootstrap.Modal(document.getElementById('customAlertModal'));
+  const customConfirmModal = new bootstrap.Modal(document.getElementById('customConfirmModal'));
+
+  // --- Telegram Mini App: цвета оболочки, вибрация, кнопка «Назад» ---
+  // Работает только внутри Telegram (есть initData). В обычном браузере и в PWA TG = null,
+  // и функции ниже ничего не делают.
+  const TG = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) ? window.Telegram.WebApp : null;
+  const APP_BG_COLOR = '#060606';
+
+  function tgSupports(version) {
+    return !!(TG && typeof TG.isVersionAtLeast === 'function' && TG.isVersionAtLeast(version));
+  }
+
+  // Короткая вибрация: 'impact' — нажатие, 'selection' — выбор, 'success' / 'error' — итог действия
+  function haptic(kind) {
+    if (!tgSupports('6.1') || !TG.HapticFeedback) return;
+    try {
+      if (kind === 'success' || kind === 'error') TG.HapticFeedback.notificationOccurred(kind);
+      else if (kind === 'selection') TG.HapticFeedback.selectionChanged();
+      else TG.HapticFeedback.impactOccurred('light');
+    } catch (e) {}
+  }
+
+  // Шапка, фон и нижняя панель Telegram — в цвет приложения. Приложение всегда тёмное (как в Figma),
+  // схему Telegram (colorScheme) только отмечаем в data-атрибуте <html>.
+  function applyTelegramTheme() {
+    if (!TG) return;
+    document.documentElement.dataset.tgScheme = TG.colorScheme || 'dark';
+    try {
+      if (tgSupports('6.1')) {
+        TG.setHeaderColor(APP_BG_COLOR);
+        TG.setBackgroundColor(APP_BG_COLOR);
+      }
+      if (tgSupports('7.10') && TG.setBottomBarColor) TG.setBottomBarColor(APP_BG_COLOR);
+    } catch (e) {}
+  }
+
+  // «Назад» в Telegram закрывает верхнее открытое окно
+  // «Назад» Telegram — только чтобы закрыть открытое окно; разделы переключаются таб-баром и свайпом
+  function syncTelegramBackButton() {
+    if (!tgSupports('6.1') || !TG.BackButton) return;
+    if (document.querySelector('.modal.show')) TG.BackButton.show();
+    else TG.BackButton.hide();
+  }
+
+  function onTelegramBack() {
+    const open = document.querySelectorAll('.modal.show');
+    if (open.length) bootstrap.Modal.getOrCreateInstance(open[open.length - 1]).hide();
+  }
+
+  function setupTelegram() {
+    if (!TG) return;
+    applyTelegramTheme();
+    if (TG.onEvent) TG.onEvent('themeChanged', applyTelegramTheme);
+    if (tgSupports('6.1') && TG.BackButton) {
+      TG.BackButton.onClick(onTelegramBack);
+      document.addEventListener('shown.bs.modal', syncTelegramBackButton);
+      document.addEventListener('hidden.bs.modal', syncTelegramBackButton);
+      syncTelegramBackButton();
+    }
+  }
+
+  // Перезапуск CSS-анимации элемента (классы анимаций — в app.css)
+  function restartAnimation(el, cls) {
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  // Нажатия: вкладки — вибрация и «пружинка» иконки, чипы фильтра и сортировка — вибрация выбора
+  document.addEventListener('click', (e) => {
+    const target = e.target.closest && e.target.closest('.tabbar-item, .filter-chip, .sort-dropdown-item');
+    if (!target) return;
+    const isTab = target.classList.contains('tabbar-item');
+    haptic(isTab ? 'impact' : 'selection');
+    if (isTab) restartAnimation(target.querySelector('.tab-ico'), 'fx-pop');
+  });
+
+  // Разделы главной: «Статистика» (#stats), «Преподаватели» (#teachers), «Дедлайны» (#deadlines).
+  // Переключение без перезагрузки — таб-баром или свайпом влево/вправо. Адрес (#teachers …) меняется
+  // без новой записи в истории: прямые ссылки работают, а кнопка «назад» по разделам не ходит.
+  // Активна та кнопка таб-бара, чей раздел открыт.
+  function setActiveTab(tab) {
+    document.querySelectorAll('.bottom-tabbar .tabbar-item').forEach(t => {
+      const on = t === tab;
+      t.classList.toggle('active', on);
+      if (on) t.setAttribute('aria-current', 'page');
+      else t.removeAttribute('aria-current');
+    });
+  }
+  const VIEWS = { stats: 'viewStats', teachers: 'viewTeachers', deadlines: 'viewDeadlines' };
+  let currentViewName = null;
+  function currentView() {
+    const h = location.hash.slice(1);
+    return VIEWS[h] ? h : 'stats';
+  }
+  function goView(name) {
+    if (!VIEWS[name]) name = 'stats';
+    if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+    showView(name);
+  }
+  function showView(name) {
+    if (!VIEWS[name]) name = 'stats';
+    const changed = currentViewName !== name;
+    currentViewName = name;
+    Object.keys(VIEWS).forEach(k => document.getElementById(VIEWS[k]).classList.toggle('d-none', k !== name));
+    setActiveTab(document.querySelector(`.bottom-tabbar .tabbar-item[data-view="${name}"]`));
+    if (name === 'teachers') { renderTeachersList(); updateAdminUI(); }
+    if (name === 'deadlines') {
+      renderDeadlines();
+      markDeadlinesSeen();
+      updateDeadlinesDot();
+    }
+    if (changed) window.scrollTo(0, 0);
+    syncTelegramBackButton();
+  }
+  window.addEventListener('hashchange', () => showView(currentView()));   // адрес изменили вручную
+  // Кнопки таб-бара — ссылки #stats / #teachers / #deadlines: переключаем сами, без записи в истории
+  // (таб-бар в разметке ниже скрипта — поэтому слушаем клики на документе)
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('.bottom-tabbar a[data-view]');
+    if (!a) return;
+    e.preventDefault();
+    goView(a.dataset.view);
+  });
+  // Свайп: Статистика ↔ Преподаватели ↔ Дедлайны ↔ Личный кабинет (порядок кнопок таб-бара)
+  enableTabSwipe(() => ['stats', 'teachers', 'deadlines', 'cabinet'], () => currentViewName, (name, dir) => {
+    haptic('selection');
+    if (name === 'cabinet') { location.href = 'cabinet.html'; return; }
+    goView(name);
+    swipeIn(document.getElementById(VIEWS[name]), dir);
+  });
+
+  // Замена браузерных showAlert()/confirm() на модалки в стиле приложения.
+  // showAlert — просто показать сообщение, ждать не обязательно (сразу продолжаем/выходим).
+  // showConfirm — возвращает Promise<boolean>, обязательно await перед проверкой результата.
+  function showAlert(message) {
+    document.getElementById('customAlertMessage').innerText = message;
+    customAlertModal.show();
+  }
+
+  function showConfirm(message) {
+    return new Promise((resolve) => {
+      document.getElementById('customConfirmMessage').innerText = message;
+      const modalEl = document.getElementById('customConfirmModal');
+      const okBtn = document.getElementById('customConfirmOkBtn');
+      let confirmed = false;
+
+      const onOk = () => { confirmed = true; customConfirmModal.hide(); };
+      const onHidden = () => {
+        okBtn.removeEventListener('click', onOk);
+        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        resolve(confirmed);
+      };
+
+      okBtn.addEventListener('click', onOk);
+      modalEl.addEventListener('hidden.bs.modal', onHidden);
+      customConfirmModal.show();
+    });
+  }
+
+
+  async function init() {
+    // Инициализация Telegram Mini App
+    if (window.Telegram && window.Telegram.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.expand();
+      if (tg.disableVerticalSwipes) {
+        tg.disableVerticalSwipes();
+      }
+      tg.ready();
+    }
+    setupTelegram();
+
+    updateAdminUI();
+    await loadData();
+    showView(currentView());                 // index.html#teachers / #deadlines — сразу нужный раздел
+    updateDeadlinesDot();
+    refreshCabinetProfile();
+    updateAdminUI();
+    checkWhatsNew();
+  }
+
+  // "Что нового" — короткий список последних изменений, показывается один раз после
+  // обновления сайта (localStorage 'whats_new_seen' общий с cabinet.html, тот же ключ).
+  // WHATS_NEW_DATE подставляется автоматически скриптом deploy-fix.ps1 при каждом деплое —
+  // руками её трогать не нужно. При каждом заметном обновлении: поднять WHATS_NEW_VERSION
+  // и заменить WHATS_NEW_ITEMS (значения должны совпадать в index.html и cabinet.html).
+  const WHATS_NEW_VERSION = 10;
+  const WHATS_NEW_DATE = '28.09.2026, 15:40';
+  const WHATS_NEW_ITEMS = [
+    'Studak — электронный пропуск группы: кнопка «Studak» в шапке личного кабинета открывает его на весь экран',
+    'Нажмите на пропуск — на обороте QR-код. Он одноразовый, живёт 5 минут и сам обновляется, пока пропуск открыт',
+    'QR проверяется камерой любого телефона без входа: видно только ФИО, роль, номер в списке, логин и фото',
+    'В Telegram в кабинете появилась строка «Сканировать пропуск» — проверка QR прямо в мини-приложении',
+    'Пропуск закрывается крестиком или свайпом вниз, наклоняется вслед за телефоном'
+  ];
+
+  function checkWhatsNew() {
+    const seenVersion = Number(localStorage.getItem('whats_new_seen') || 0);
+    if (seenVersion >= WHATS_NEW_VERSION) return;
+
+    document.getElementById('whatsNewDate').innerText = `Обновлено: ${WHATS_NEW_DATE}`;
+    document.getElementById('whatsNewList').innerHTML = WHATS_NEW_ITEMS.map(i => `<li class="mb-1">${i}</li>`).join('');
+    const modalEl = document.getElementById('whatsNewModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.addEventListener('hidden.bs.modal', () => {
+      localStorage.setItem('whats_new_seen', String(WHATS_NEW_VERSION));
+    }, { once: true });
+    modal.show();
+  }
+
+  // Строки списка появляются по очереди только после загрузки, смены сортировки или фильтров —
+  // не на каждую букву в поиске и не после сохранения
+  let animateRowsNext = true;
+  let filtersChangedInSheet = false;
+
+  async function loadData() {
+    try {
+      const response = await fetch(`./data.json?t=${Date.now()}`);
+      appData = await response.json();
+      if (!appData.subjects || appData.subjects.length === 0) {
+        appData.subjects = DEFAULT_SUBJECTS;
+      }
+      if (!appData.teachers) {
+        appData.teachers = [];
+      }
+      if (!appData.announcements) {
+        appData.announcements = [];
+      }
+      if (!appData.deadlines) {
+        appData.deadlines = [];
+      }
+      populateSubjectFilter();
+      updateStats();
+      renderTable();
+      renderGeneralAnnouncements();
+      updateCabinetUnreadBadge();
+      renderExtendedStats();
+      renderAnalyticsChart();
+    } catch (err) {
+      console.error('Ошибка загрузки данных:', err);
+      const tbody = document.getElementById('studentsTableBody');
+      if (tbody.querySelector('.skeleton-row')) {
+        tbody.removeAttribute('aria-busy');
+        tbody.innerHTML = '<div class="load-error">Не удалось загрузить данные. Проверьте интернет и обновите страницу.</div>';
+      }
+    }
+  }
+
+  // --- Кто вошёл в личный кабинет на этом устройстве: student_id из profiles (Supabase Auth,
+  // та же сессия, что в cabinet.html). Сначала — сохранённый профиль (сразу и без сети),
+  // затем сверка с сервером. Вход администратора по GitHub-токену с этим не связан.
+  const SUPABASE_URL = 'https://woiqekpuoddxixlrbvkp.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_I1jhpJqVFBcd_ceZ-hYmGg_-MdIiZ1k';
+  const PROFILE_CACHE_KEY = 'journal_profile';
+  const sb = window.supabase
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } })
+    : null;
+  let myCabinetProfile = (() => { try { return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || 'null'); } catch (e) { return null; } })();
+
+  function saveCabinetProfile(profile) {
+    myCabinetProfile = profile;
+    try {
+      if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+      else localStorage.removeItem(PROFILE_CACHE_KEY);
+    } catch (e) {}
+  }
+
+  async function refreshCabinetProfile() {
+    localStorage.removeItem('my_student_id');   // старый вход user## больше не используется
+    if (!sb) return;
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        if (navigator.onLine) saveCabinetProfile(null);
+      } else {
+        const { data, error } = await sb.from('profiles').select('student_id, login').eq('user_id', session.user.id).maybeSingle();
+        if (!error) saveCabinetProfile(data ? { user_id: session.user.id, student_id: data.student_id, login: data.login } : null);
+      }
+    } catch (e) {
+      // Нет сети — остаётся сохранённый профиль
+    }
+    updateCabinetUnreadBadge();
+  }
+
+  // Красная точка на вкладке "Личный кабинет" в таб-баре, если у вошедшего на этом
+  // устройстве студента есть персональные объявления, которые он ещё не открывал (seen_announcements),
+  // или новые дедлайны, которые он ещё не видел (seen_deadlines; прошедшие больше недели назад не считаются)
+  function updateCabinetUnreadBadge() {
+    const dot = document.getElementById('cabinetUnreadDot');
+    if (!dot) return;
+
+    const myId = myCabinetProfile && myCabinetProfile.student_id;
+    if (!myId) { dot.classList.add('d-none'); return; }
+
+    let seen = [];
+    try { seen = JSON.parse(localStorage.getItem('seen_announcements') || '[]'); } catch (e) {}
+
+    const hasUnread = (appData.announcements || []).some(a =>
+      a.targetType === 'STUDENT' && a.targetStudentId === myId && !seen.includes(a.id)
+    );
+    // Новые дедлайны — своя точка на кнопке «Дедлайны» (updateDeadlinesDot, shared.js)
+    dot.classList.toggle('d-none', !hasUnread);
+  }
+
+  function updateStats() {
+    const totalStudents = appData.students.length;
+    const budget = appData.students.filter(s => s.status === 'Бюджет').length;
+    const paid = totalStudents - budget;
+
+    let unexcusedTotal = 0;
+    let excusedTotal = 0;
+    let redZoneCount = 0;
+
+    appData.students.forEach(student => {
+      const studentAbs = appData.absences.filter(a => a.studentId === student.id);
+      let unexcused = 0;
+      studentAbs.forEach(a => {
+        if (a.isExcused) excusedTotal += Number(a.totalHours);
+        else {
+          unexcusedTotal += Number(a.totalHours);
+          unexcused += Number(a.totalHours);
+        }
+      });
+      if (unexcused >= 14) redZoneCount++;
+    });
+
+    document.getElementById('statTotalStudents').innerText = totalStudents;
+    document.getElementById('statBudget').innerText = budget;
+    document.getElementById('statPaid').innerText = paid;
+    document.getElementById('statUnexcusedHours').innerText = unexcusedTotal;
+    document.getElementById('statExcusedHours').innerText = excusedTotal;
+    document.getElementById('statRedZone').innerText = redZoneCount;
+  }
+
+  // --- Номера по журналу: по алфавиту, 1..N, одни и те же при любом фильтре ---
+  function getJournalNumbers() {
+    const ordered = [...appData.students].sort((a, b) =>
+      `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'ru')
+    );
+    const map = {};
+    ordered.forEach((s, i) => { map[s.id] = i + 1; });
+    return map;
+  }
+
+  // --- Объявления ---
+  function openAnnouncementModal() {
+    document.getElementById('announcementText').value = '';
+    document.getElementById('announcementTarget').value = 'ALL';
+    const journalNumbers = getJournalNumbers();
+    const ordered = [...appData.students].sort((a, b) => journalNumbers[a.id] - journalNumbers[b.id]);
+    document.getElementById('announcementStudent').innerHTML = ordered
+      .map(s => `<option value="${s.id}">${journalNumbers[s.id]}. ${s.lastName} ${s.firstName}</option>`)
+      .join('');
+    toggleAnnouncementStudentSelect();
+    announcementModal.show();
+  }
+
+  function toggleAnnouncementStudentSelect() {
+    const isStudent = document.getElementById('announcementTarget').value === 'STUDENT';
+    document.getElementById('announcementStudentSelectWrap').classList.toggle('d-none', !isStudent);
+  }
+
+  async function saveAnnouncement() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+    const text = document.getElementById('announcementText').value.trim();
+    if (!text) return showAlert('Введите текст объявления');
+
+    const target = document.getElementById('announcementTarget').value;
+    const announcement = {
+      id: 'ann-' + Date.now(),
+      text,
+      date: new Date().toISOString().slice(0, 10),
+      targetType: target
+    };
+    if (target === 'STUDENT') {
+      announcement.targetStudentId = document.getElementById('announcementStudent').value;
+    }
+
+    appData.announcements.push(announcement);
+    await saveDataToGitHub('Добавлено объявление');
+    announcementModal.hide();
+    renderGeneralAnnouncements();
+    updateCabinetUnreadBadge();
+  }
+
+  async function deleteAnnouncement(id) {
+    if (!(await showConfirm('Удалить это объявление?'))) return;
+    appData.announcements = appData.announcements.filter(a => a.id !== id);
+    await saveDataToGitHub('Удалено объявление');
+    renderGeneralAnnouncements();
+    updateCabinetUnreadBadge();
+  }
+
+  // --- Дедлайны (админ): список, добавление, изменение, удаление. Хранятся в appData.deadlines:
+  // { id, subject, text, dueDate: 'YYYY-MM-DD', createdAt }. Все видят их в разделе «Дедлайны».
+  // Даты, «через N дней», карточки и календарь — общий код в shared.js.
+  let editingDeadlineId = null;
+
+
+  function openDeadlinesModal() {
+    renderDeadlinesAdminList();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deadlinesModal')).show();
+  }
+
+  function renderDeadlinesAdminList() {
+    const list = document.getElementById('deadlinesAdminList');
+    const today = toISODateLocal(new Date());
+    const all = appData.deadlines || [];
+    const upcoming = all.filter(d => d.dueDate >= today).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const past = all.filter(d => d.dueDate < today).sort((a, b) => b.dueDate.localeCompare(a.dueDate));
+    list.innerHTML = '';
+    if (!all.length) {
+      list.innerHTML = '<div class="text-secondary text-center py-3">Дедлайнов и зачётов пока нет</div>';
+      return;
+    }
+    const addGroup = (title, items, isPast) => {
+      if (!items.length) return;
+      const h = document.createElement('div');
+      h.className = 'dl-admin-group';
+      h.textContent = title;
+      list.appendChild(h);
+      items.forEach(d => {
+        const item = document.createElement('div');
+        item.className = 'dl-admin-item' + (isPast ? ' is-past' : '');
+        item.innerHTML = `<div class="dl-admin-subject"></div><div class="dl-admin-text"></div><div class="dl-admin-meta"></div>
+          <div class="dl-admin-actions">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-act="edit">Изменить</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" data-act="delete">Удалить</button>
+          </div>`;
+        const isZachet = d.type === 'zachet';
+        if (isZachet) item.classList.add('is-zachet');
+        item.querySelector('.dl-admin-subject').textContent = (isZachet ? 'Зачёт · ' : '') + d.subject;
+        item.querySelector('.dl-admin-text').textContent = d.text || '';
+        item.querySelector('.dl-admin-meta').textContent = `${isZachet ? '' : 'до '}${formatDateShort(deadlineDate(d.dueDate))} · ${deadlineRelative(deadlineDaysLeft(d.dueDate))}`;
+        item.querySelector('[data-act="edit"]').addEventListener('click', () => openDeadlineForm(d.id));
+        item.querySelector('[data-act="delete"]').addEventListener('click', () => deleteDeadline(d.id));
+        list.appendChild(item);
+      });
+    };
+    addGroup('Предстоящие', upcoming, false);
+    addGroup('Прошедшие', past, true);
+  }
+
+  function openDeadlineForm(id) {
+    const existing = id ? (appData.deadlines || []).find(d => d.id === id) : null;
+    editingDeadlineId = existing ? existing.id : null;
+    const select = document.getElementById('deadlineSubject');
+    const subjects = [...appData.subjects];
+    if (existing && !subjects.includes(existing.subject)) subjects.push(existing.subject);
+    select.innerHTML = '<option value="">Выберите предмет</option>';
+    subjects.forEach(sub => { const o = document.createElement('option'); o.value = sub; o.textContent = sub; select.appendChild(o); });
+    select.value = existing ? existing.subject : '';
+    document.getElementById('deadlineText').value = existing ? (existing.text || '') : '';
+    document.getElementById('deadlineDueDate').value = existing ? existing.dueDate : '';
+    const isZachet = !!existing && existing.type === 'zachet';
+    document.getElementById(isZachet ? 'deadlineTypeZachet' : 'deadlineTypeDeadline').checked = true;
+    updateDeadlineFormType();
+    const listModal = bootstrap.Modal.getInstance(document.getElementById('deadlinesModal'));
+    if (listModal) listModal.hide();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deadlineFormModal')).show();
+  }
+
+  // Тип записи: «Дедлайн» (что сделать и срок) или «Зачёт» (дата и необязательный комментарий).
+  // В data.json — поле type: 'deadline' | 'zachet'; записи без type считаются дедлайнами.
+  function deadlineFormType() {
+    return document.getElementById('deadlineTypeZachet').checked ? 'zachet' : 'deadline';
+  }
+  function updateDeadlineFormType() {
+    const isZachet = deadlineFormType() === 'zachet';
+    const editing = !!editingDeadlineId;
+    document.getElementById('deadlineFormTitle').innerText = isZachet ? (editing ? 'Изменить зачёт' : 'Новый зачёт') : (editing ? 'Изменить дедлайн' : 'Новый дедлайн');
+    document.getElementById('deadlineTextLabel').innerText = isZachet ? 'Комментарий (необязательно)' : 'Что нужно сделать';
+    document.getElementById('deadlineText').placeholder = isZachet ? 'Например: аудитория 512, с собой зачётку' : 'Например: сдать презентацию по модели 4P';
+    document.getElementById('deadlineDueDateLabel').innerText = isZachet ? 'Дата зачёта' : 'Срок';
+  }
+
+  // Закрыть форму и вернуться к списку дедлайнов
+  function closeDeadlineForm() {
+    const formEl = document.getElementById('deadlineFormModal');
+    formEl.addEventListener('hidden.bs.modal', () => openDeadlinesModal(), { once: true });
+    bootstrap.Modal.getOrCreateInstance(formEl).hide();
+  }
+
+  async function saveDeadline() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+    const subject = document.getElementById('deadlineSubject').value;
+    const text = document.getElementById('deadlineText').value.trim();
+    const dueDate = document.getElementById('deadlineDueDate').value;
+    const type = deadlineFormType();
+    const isZachet = type === 'zachet';
+    const noun = isZachet ? 'зачёт' : 'дедлайн';
+    if (!subject) return showAlert('Выберите предмет');
+    if (!text && !isZachet) return showAlert('Опишите, что нужно сделать');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return showAlert(isZachet ? 'Укажите дату зачёта' : 'Укажите срок');
+    if (dueDate < toISODateLocal(new Date())) {
+      if (!(await showConfirm(`${isZachet ? 'Дата' : 'Срок'} ${formatDateShort(deadlineDate(dueDate))} уже ${isZachet ? 'прошла' : 'прошёл'}. Всё равно сохранить ${noun}?`))) return;
+    }
+
+    const backup = JSON.parse(JSON.stringify(appData.deadlines || []));
+    let message;
+    if (editingDeadlineId) {
+      const d = appData.deadlines.find(x => x.id === editingDeadlineId);
+      Object.assign(d, { type, subject, text, dueDate });
+      message = `Изменён ${noun}: ${subject} — ${isZachet ? '' : 'до '}${formatDateShort(deadlineDate(dueDate))}`;
+    } else {
+      appData.deadlines.push({ id: 'dl-' + Date.now(), type, subject, text, dueDate, createdAt: new Date().toISOString() });
+      message = `Добавлен ${noun}: ${subject} — ${isZachet ? '' : 'до '}${formatDateShort(deadlineDate(dueDate))}`;
+    }
+
+    const btn = document.getElementById('deadlineSaveBtn');
+    btn.disabled = true;
+    const ok = await saveDataToGitHub(message);
+    btn.disabled = false;
+    if (!ok) { appData.deadlines = backup; return; }   // не сохранилось — форма остаётся с введёнными данными
+    editingDeadlineId = null;
+    // Сначала админ видит «Изменения успешно сохранены!», после закрытия — снова список дедлайнов
+    document.getElementById('customAlertModal').addEventListener('hidden.bs.modal', () => openDeadlinesModal(), { once: true });
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deadlineFormModal')).hide();
+    updateCabinetUnreadBadge();
+    renderDeadlines();
+  }
+
+  async function deleteDeadline(id) {
+    const d = (appData.deadlines || []).find(x => x.id === id);
+    if (!d) return;
+    const noun = d.type === 'zachet' ? 'зачёт' : 'дедлайн';
+    if (!(await showConfirm(`Удалить ${noun} «${d.subject}» ${d.type === 'zachet' ? '' : 'до '}${formatDateShort(deadlineDate(d.dueDate))}?`))) return;
+    const backup = JSON.parse(JSON.stringify(appData.deadlines));
+    appData.deadlines = appData.deadlines.filter(x => x.id !== id);
+    const ok = await saveDataToGitHub(`Удалён ${noun}: ${d.subject} — ${d.type === 'zachet' ? '' : 'до '}${formatDateShort(deadlineDate(d.dueDate))}`);
+    if (!ok) appData.deadlines = backup;
+    renderDeadlinesAdminList();
+    updateCabinetUnreadBadge();
+    renderDeadlines();
+  }
+
+  function announcementCardHtml(a) {
+    return `
+      <div class="student-summary-card mb-2">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <div class="small text-secondary mb-1">${formatDateShort(a.date)}</div>
+            <div class="text-white">${a.text}</div>
+          </div>
+          <button class="btn btn-sm btn-outline-danger admin-only d-none flex-shrink-0" onclick="deleteAnnouncement('${a.id}')">✕</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderGeneralAnnouncements() {
+    const list = (appData.announcements || []).filter(a => a.targetType === 'ALL')
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const section = document.getElementById('generalAnnouncementsSection');
+    if (list.length === 0) {
+      section.classList.add('d-none');
+      return;
+    }
+    section.classList.remove('d-none');
+    document.getElementById('generalAnnouncementsList').innerHTML = list.map(announcementCardHtml).join('');
+    updateAdminUI();
+  }
+
+
+  // --- Преподавательский состав ---
+  // «Преподаватели» — раздел страницы (index.html#teachers); сам раздел рисует showView
+  function openTeachersList() {
+    goView('teachers');
+  }
+
+  // Форма контроля по предмету: зачёт или экзамен (список зачётных предметов фиксирован — как в учебном плане)
+  const ZACHET_SUBJECTS = ['Маркетинг инноваций', 'Функционально-стоимостный анализ', 'Логистика'];
+  function getExamType(subject) {
+    return ZACHET_SUBJECTS.includes(subject) ? 'зачёт' : 'экзамен';
+  }
+
+  // Цветной акцент карточки преподавателя — по кругу, чтобы список не выглядел монотонно
+  // (цвета дизайн-системы: зелёный/жёлтый/розово-красный/синий акцент)
+  const TEACHER_ACCENT_COLORS = ['#34c759', '#ffd60a', '#ff628f', '#0088ff'];
+
+  // Иконка по смыслу дисциплины (не декоративная — конкретно под тему предмета)
+  const SUBJECT_ICONS = {
+    'Интегрированные маркетинговые коммуникации': '<path d="M3 11v3a2 2 0 0 0 2 2h1l2 5h2l-1.5-5H10l9 4V6l-9 4H5a2 2 0 0 0-2 1z"/>',
+    'Кураторский час': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    'Логистика': '<rect x="1" y="6" width="14" height="11"/><path d="M15 9h4l3 3v5h-7z"/><circle cx="6" cy="19" r="2"/><circle cx="17.5" cy="19" r="2"/>',
+    'Маркетинг инноваций': '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1v.2h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
+    'Маркетинг услуг': '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/>',
+    'Маркетинговые исследования и аналитика': '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+    'Стратегический маркетинг': '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    'Физическая культура': '<rect x="2" y="9" width="3" height="6" rx="1"/><rect x="19" y="9" width="3" height="6" rx="1"/><line x1="7" y1="12" x2="17" y2="12"/><rect x="5" y="7" width="2" height="10" rx="0.5"/><rect x="17" y="7" width="2" height="10" rx="0.5"/>',
+    'Функционально-стоимостный анализ': '<path d="M12 3v18"/><path d="M7 21h10"/><path d="M5 7h4M15 7h4"/><path d="M3 7l2 5a2 2 0 0 0 4 0l-2-5"/><path d="M17 7l2 5a2 2 0 0 0 4 0l-2-5"/>',
+    'Эконометрика': '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>'
+  };
+  const DEFAULT_SUBJECT_ICON = '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 2-2 3.5"/><circle cx="12" cy="17" r="0.3" fill="currentColor"/>';
+
+  function renderTeachersList() {
+    const container = document.getElementById('teachersList');
+    if (!appData.teachers || appData.teachers.length === 0) {
+      container.innerHTML = '<div class="p-3 text-secondary text-center">Список пока пуст</div>';
+      return;
+    }
+    const ordered = [...appData.teachers].sort((a, b) => a.subject.localeCompare(b.subject, 'ru'));
+    container.innerHTML = ordered.map((t, i) => {
+      const examType = getExamType(t.subject);
+      const badgeClass = examType === 'зачёт' ? 'bg-success' : 'bg-primary';
+      const accent = TEACHER_ACCENT_COLORS[i % TEACHER_ACCENT_COLORS.length];
+      const iconPath = SUBJECT_ICONS[t.subject] || DEFAULT_SUBJECT_ICON;
+      return `
+      <div class="teacher-card mb-2" style="border-left-color: ${accent};" onclick="toggleTeacherCard(this)">
+        <div class="teacher-card-header">
+          <span class="badge ${badgeClass} bg-opacity-75 fw-normal">${examType}</span>
+          <button type="button" class="teacher-card-edit-btn admin-only d-none" onclick="event.stopPropagation(); openEditTeacherModal('${t.id}')" title="Изменить">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </button>
+        </div>
+        <div class="teacher-card-title-row">
+          <span class="teacher-card-icon" style="color: ${accent};">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg>
+          </span>
+          <div class="teacher-card-title">${t.subject}</div>
+          <svg class="teacher-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="teacher-card-details">
+          <div><span class="text-secondary">Лекции:</span> <span class="text-white">${t.lecture || '—'}</span></div>
+          <div><span class="text-secondary">ПЗ:</span> <span class="text-white">${t.practice || '—'}</span></div>
+          <div><span class="text-secondary">Лаб.:</span> <span class="text-white">${t.lab || '—'}</span></div>
+        </div>
+      </div>
+    `;
+    }).join('');
+    updateAdminUI();
+  }
+
+  // Клик по карточке преподавателя — показать/скрыть Лекции/ПЗ/Лаб (кнопка "Изменить" внутри
+  // сама останавливает всплытие, чтобы не переключать карточку заодно)
+  function toggleTeacherCard(el) {
+    el.classList.toggle('expanded');
+  }
+
+  function openAddTeacherModal() {
+    document.getElementById('teacherEditTitle').innerText = 'Добавить предмет';
+    document.getElementById('editTeacherId').value = '';
+    document.getElementById('teacherSubject').innerHTML = appData.subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+    document.getElementById('teacherLecture').value = '';
+    document.getElementById('teacherPractice').value = '';
+    document.getElementById('teacherLab').value = '';
+    document.getElementById('teacherDeleteBtn').style.display = 'none';
+    teacherEditModal.show();
+  }
+
+  function openEditTeacherModal(id) {
+    const t = appData.teachers.find(x => x.id === id);
+    if (!t) return;
+    document.getElementById('teacherEditTitle').innerText = 'Редактировать предмет';
+    document.getElementById('editTeacherId').value = t.id;
+    document.getElementById('teacherSubject').innerHTML = appData.subjects.map(s =>
+      `<option value="${s}" ${s === t.subject ? 'selected' : ''}>${s}</option>`
+    ).join('');
+    document.getElementById('teacherLecture').value = t.lecture || '';
+    document.getElementById('teacherPractice').value = t.practice || '';
+    document.getElementById('teacherLab').value = t.lab || '';
+    document.getElementById('teacherDeleteBtn').style.display = 'inline-block';
+    teacherEditModal.show();
+  }
+
+  async function saveTeacher() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+    const id = document.getElementById('editTeacherId').value;
+    const subject = document.getElementById('teacherSubject').value;
+    const lecture = document.getElementById('teacherLecture').value.trim();
+    const practice = document.getElementById('teacherPractice').value.trim();
+    const lab = document.getElementById('teacherLab').value.trim();
+
+    if (id) {
+      const t = appData.teachers.find(x => x.id === id);
+      if (t) {
+        t.subject = subject;
+        t.lecture = lecture;
+        t.practice = practice;
+        t.lab = lab;
+      }
+    } else {
+      appData.teachers.push({ id: 't-' + Date.now(), subject, lecture, practice, lab });
+    }
+
+    await saveDataToGitHub('Обновлён список преподавателей');
+    teacherEditModal.hide();
+    renderTeachersList();
+  }
+
+  async function deleteTeacher() {
+    const id = document.getElementById('editTeacherId').value;
+    if (!id) return;
+    if (!(await showConfirm('Удалить этот предмет из списка преподавателей?'))) return;
+    appData.teachers = appData.teachers.filter(t => t.id !== id);
+    await saveDataToGitHub('Удалён предмет из списка преподавателей');
+    teacherEditModal.hide();
+    renderTeachersList();
+  }
+
+  // --- Сортировка таблицы ---
+  // Первый клик: ФИО, номер и тип — по алфавиту/возрастанию; часы и даты — сначала бо́льшие/свежие
+  const SORT_DEFAULT_DIR = { number: 'asc', name: 'asc', status: 'asc', unexcused: 'desc', excused: 'desc', last: 'desc' };
+  let sortState = { key: 'number', dir: 'asc' };
+
+  function setSort(key) {
+    if (sortState.key === key) {
+      sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortState = { key: key, dir: SORT_DEFAULT_DIR[key] || 'asc' };
+    }
+    animateRowsNext = true;
+    renderTable();
+  }
+
+  function updateSortIndicators() {
+    document.querySelectorAll('th.sortable').forEach(th => {
+      const active = th.dataset.sort === sortState.key;
+      th.classList.toggle('asc', active && sortState.dir === 'asc');
+      th.classList.toggle('desc', active && sortState.dir === 'desc');
+      th.setAttribute('aria-sort', active ? (sortState.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+    });
+    document.querySelectorAll('#sortDropdownMenu .sort-dropdown-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.sortKey === sortState.key);
+    });
+  }
+
+  // --- Фильтры по периоду и предмету ---
+  // Осенний семестр: сентябрь–январь. Весенний: февраль–июнь.
+  function getSemesterRange(now) {
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0 = январь
+    if (month >= 8 || month === 0) {
+      const startYear = month === 0 ? year - 1 : year;
+      return { start: new Date(startYear, 8, 1), end: new Date(startYear + 1, 1, 1) };
+    }
+    return { start: new Date(year, 1, 1), end: new Date(year, 6, 1) };
+  }
+
+  function getPeriodRangeFor(periodValue) {
+    const now = new Date();
+    if (periodValue === 'WEEK') {
+      const day = now.getDay(); // 0 = воскресенье
+      const diffToMonday = day === 0 ? -6 : 1 - day;
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+      return { start, end };
+    }
+    if (periodValue === 'MONTH') {
+      return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
+    }
+    if (periodValue === 'SEMESTER') {
+      return getSemesterRange(now);
+    }
+    return null; // 'ALL' — без ограничения по датам
+  }
+
+  function getPeriodRange() {
+    return getPeriodRangeFor(document.getElementById('periodFilter').value);
+  }
+
+  function toISODateLocal(d) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // --- Аналитика по группе (график) ---
+  let analyticsChartInstance = null;
+
+  // --- Расширенная статистика по группе ---
+  function renderExtendedStats() {
+    const totalStudents = appData.students.length;
+
+    let totalUnexcused = 0;
+    appData.absences.forEach(a => { if (!a.isExcused) totalUnexcused += Number(a.totalHours); });
+    const avgHours = totalStudents ? (totalUnexcused / totalStudents) : 0;
+    document.getElementById('extStatAvgHours').innerText = avgHours.toFixed(1);
+
+    const bySubject = {};
+    appData.absences.forEach(a => {
+      if (a.isExcused) return;
+      const s = a.subject || 'Без предмета';
+      bySubject[s] = (bySubject[s] || 0) + Number(a.totalHours);
+    });
+    const worstEntry = Object.entries(bySubject).sort((a, b) => b[1] - a[1])[0];
+    document.getElementById('extStatWorstSubject').innerText = worstEntry ? `${worstEntry[0]} (${worstEntry[1]} ч)` : '—';
+
+    // Справка просрочена: пропуск уважительный, справка не сдана, срок сдачи уже прошёл
+    const today = new Date();
+    let overdueCerts = 0;
+    appData.absences.forEach(a => {
+      if (!a.isExcused || a.certSubmitted || !a.certDueDate) return;
+      const due = new Date(a.certDueDate);
+      if (!isNaN(due.getTime()) && due < today) overdueCerts++;
+    });
+    document.getElementById('extStatOverdueCerts').innerText = overdueCerts;
+
+    const studentsWithAbsences = new Set(appData.absences.map(a => a.studentId));
+    const perfectCount = appData.students.filter(s => !studentsWithAbsences.has(s.id)).length;
+    document.getElementById('extStatPerfect').innerText = perfectCount;
+  }
+
+  function renderAnalyticsChart() {
+    const canvas = document.getElementById('analyticsChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    // Неуважительные часы за текущий семестр по предметам, по убыванию
+    const range = getSemesterRange(new Date());
+    const bySubject = {};
+    appData.subjects.forEach(s => { bySubject[s] = 0; });
+    appData.absences.forEach(a => {
+      if (a.isExcused) return;
+      const d = new Date(a.date);
+      if (isNaN(d.getTime()) || d < range.start || d >= range.end) return;
+      const subj = a.subject || 'Без предмета';
+      bySubject[subj] = (bySubject[subj] || 0) + Number(a.totalHours);
+    });
+    const entries = Object.entries(bySubject).filter(([, h]) => h > 0).sort((a, b) => b[1] - a[1]);
+    const labels = entries.map(([s]) => s.length > 18 ? s.slice(0, 17) + '…' : s);
+    const values = entries.map(([, h]) => h);
+    // Горизонтальные столбцы: длинные названия предметов читаются целиком; высота — по числу предметов
+    canvas.parentElement.style.height = `${Math.max(entries.length, 1) * 34 + 30}px`;
+
+    if (analyticsChartInstance) analyticsChartInstance.destroy();
+    analyticsChartInstance = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Неуваж. часов',
+          data: values,
+          backgroundColor: '#0088ff',
+          borderRadius: 4,
+          borderSkipped: 'start',
+          barThickness: 18
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { title: (items) => entries[items[0].dataIndex][0], label: (item) => ` ${item.raw} ч неуваж.` } }
+        },
+        scales: {
+          x: { ticks: { color: '#6c6c71', precision: 0 }, grid: { color: '#1f1f1f' }, beginAtZero: true },
+          y: { ticks: { color: '#c7c7cc', font: { size: 12 } }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // --- Отчёт для деканата (Excel): строки — студенты, столбцы — дни периода, ---
+  // --- в ячейке — часы неуважительного пропуска (пусто, если 0 или воскресенье) ---
+  function generateDeanReport() {
+    if (typeof XLSX === 'undefined') {
+      showAlert('Библиотека для Excel ещё загружается — подождите секунду и попробуйте снова.');
+      return;
+    }
+
+    const periodFilter = document.getElementById('periodFilter').value;
+    let range, periodLabel;
+    if (periodFilter === 'SEMESTER') {
+      range = getSemesterRange(new Date());
+      periodLabel = 'семестр';
+    } else {
+      const now = new Date();
+      range = { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
+      periodLabel = 'месяц';
+    }
+
+    const days = [];
+    for (let d = new Date(range.start); d < range.end; d.setDate(d.getDate() + 1)) {
+      days.push(new Date(d));
+    }
+
+    const journalNumbers = getJournalNumbers();
+    const orderedStudents = [...appData.students].sort((a, b) => journalNumbers[a.id] - journalNumbers[b.id]);
+
+    const header = ['№', 'ФИО', ...days.map(d => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`)];
+    const rows = [header];
+
+    orderedStudents.forEach(s => {
+      const row = [journalNumbers[s.id], `${s.lastName} ${s.firstName}`];
+      days.forEach(day => {
+        if (day.getDay() === 0) { row.push(''); return; }
+        const dayStr = toISODateLocal(day);
+        const hours = appData.absences
+          .filter(a => a.studentId === s.id && !a.isExcused && a.date === dayStr)
+          .reduce((sum, a) => sum + Number(a.totalHours), 0);
+        row.push(hours > 0 ? hours : '');
+      });
+      rows.push(row);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 4 }, { wch: 28 }, ...days.map(() => ({ wch: 6 }))];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Отчёт');
+    XLSX.writeFile(wb, `Отчет_деканат_${periodLabel}_${toISODateLocal(new Date())}.xlsx`);
+  }
+
+  // Резервная копия текущего data.json — на случай ручного редактирования на GitHub
+  function downloadBackup() {
+    const json = JSON.stringify(appData, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `data_backup_${toISODateLocal(new Date())}.json`;
+    link.click();
+  }
+
+  // Пропуски студента с учётом текущих фильтров периода и предмета (не путать с фильтром Бюджет/Платное — тот про то, какие студенты видны, а не какие их пропуски считаются)
+  function getFilteredAbsencesForStudent(studentId) {
+    const subjectFilter = document.getElementById('subjectFilter').value;
+    const range = getPeriodRange();
+    return appData.absences.filter(a => {
+      if (a.studentId !== studentId) return false;
+      if (subjectFilter !== 'ALL' && a.subject !== subjectFilter) return false;
+      if (range) {
+        const d = new Date(a.date);
+        if (isNaN(d.getTime()) || d < range.start || d >= range.end) return false;
+      }
+      return true;
+    });
+  }
+
+  function populateSubjectFilter() {
+    const select = document.getElementById('subjectFilter');
+    const current = select.value;
+    select.innerHTML = '<option value="ALL">Все предметы</option>' +
+      appData.subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+    if (appData.subjects.includes(current)) select.value = current;
+  }
+
+  function getStudentStats(studentId) {
+    let unexcused = 0, excused = 0, lastTs = null;
+    getFilteredAbsencesForStudent(studentId).forEach(a => {
+      const h = Number(a.totalHours) || 0;
+      if (a.isExcused) excused += h; else unexcused += h;
+      const ts = new Date(a.date).getTime();
+      if (!isNaN(ts) && (lastTs === null || ts > lastTs)) lastTs = ts;
+    });
+    return { unexcused: unexcused, excused: excused, lastTs: lastTs };
+  }
+
+  function makeComparator(statsById, journalNumbers) {
+    const mul = sortState.dir === 'asc' ? 1 : -1;
+    const byName = (a, b) => journalNumbers[a.id] - journalNumbers[b.id];
+
+    return (a, b) => {
+      let cmp = 0;
+      switch (sortState.key) {
+        case 'number':
+        case 'name':
+          return mul * byName(a, b);
+        case 'status':
+          cmp = mul * (a.status || '').localeCompare(b.status || '', 'ru');
+          break;
+        case 'unexcused':
+          cmp = mul * (statsById[a.id].unexcused - statsById[b.id].unexcused);
+          break;
+        case 'excused':
+          cmp = mul * (statsById[a.id].excused - statsById[b.id].excused);
+          break;
+        case 'last': {
+          const ta = statsById[a.id].lastTs;
+          const tb = statsById[b.id].lastTs;
+          // студенты без пропусков всегда внизу, в любом направлении
+          if (ta === null && tb === null) break;
+          if (ta === null) return 1;
+          if (tb === null) return -1;
+          cmp = mul * (ta - tb);
+          break;
+        }
+      }
+      // при равенстве — по алфавиту
+      return cmp !== 0 ? cmp : byName(a, b);
+    };
+  }
+
+  // Открыть полноэкранный лист фильтров — синхронизирует активные "таблетки" с текущими
+  // значениями скрытых select-ов и строит чипы предметов заново (список может меняться)
+  function openFilterModal() {
+    const subjectContainer = document.getElementById('filterChipsSubject');
+    const currentSubject = document.getElementById('subjectFilter').value;
+    subjectContainer.innerHTML = '<button type="button" class="filter-chip" data-value="ALL" onclick="selectFilterChip(\'subjectFilter\',\'ALL\',\'filterChipsSubject\',this)"><span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span><span>Все предметы</span></button>' +
+      appData.subjects.map(s => `<button type="button" class="filter-chip" data-value="${s}" onclick="selectFilterChip('subjectFilter','${s.replace(/'/g, "\\'")}','filterChipsSubject',this)"><span class="chip-check"><svg viewBox="0 0 14 14" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M7 0a7 7 0 1 1 0 14A7 7 0 1 1 7 0zm5 4.5L10.5 3l-5 6.5-3-3-.5 1 3.5 4z"/></svg></span><span>${s}</span></button>`).join('');
+
+    syncFilterChipGroup('filterChipsType', document.getElementById('typeFilter').value);
+    syncFilterChipGroup('filterChipsPeriod', document.getElementById('periodFilter').value);
+    syncFilterChipGroup('filterChipsSubject', currentSubject);
+
+    filterModal.show();
+  }
+
+  function syncFilterChipGroup(containerId, value) {
+    document.querySelectorAll(`#${containerId} .filter-chip`).forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.value === value);
+    });
+  }
+
+  // Клик по "таблетке" фильтра — пишет значение в скрытый select (та же логика фильтрации,
+  // что и раньше) и сразу применяет фильтр, не дожидаясь нажатия "Поиск"
+  function selectFilterChip(selectId, value, groupContainerId, clickedEl) {
+    document.getElementById(selectId).value = value;
+    document.querySelectorAll(`#${groupContainerId} .filter-chip`).forEach(chip => chip.classList.remove('active'));
+    clickedEl.classList.add('active');
+    filtersChangedInSheet = true;
+    renderTable();
+  }
+
+  // Заглушка для разделов, которые ещё не реализованы (нижняя панель навигации)
+  function showComingSoon() {
+    showAlert('Данная функция ещё в разработке. Ожидайте, пожалуйста, дальнейших изменений.');
+  }
+
+  // Показывает "Пропуски актуальны на: ..." над таблицей — appData.lastUpdated
+  // проставляется автоматически при каждом сохранении админом (saveDataToGitHub)
+  function renderDataLastUpdated() {
+    const el = document.getElementById('dataLastUpdated');
+    if (!el) return;
+    if (!appData.lastUpdated) { el.innerText = ''; return; }
+    const d = new Date(appData.lastUpdated);
+    if (isNaN(d.getTime())) { el.innerText = ''; return; }
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    el.innerText = `Пропуски актуальны на: ${dd}.${mm}.${yyyy}, ${hh}:${min}`;
+  }
+
+  function renderTable() {
+    renderDataLastUpdated();
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const typeFilter = document.getElementById('typeFilter').value;
+    const tbody = document.getElementById('studentsTableBody');
+    tbody.innerHTML = '';
+    tbody.removeAttribute('aria-busy');
+    const animateRows = animateRowsNext;
+    animateRowsNext = false;
+
+    const journalNumbers = getJournalNumbers();
+
+    const filtered = appData.students.filter(s => {
+      const fullName = `${s.lastName} ${s.firstName}`.toLowerCase();
+      const matchesSearch = fullName.includes(search);
+      const matchesType = typeFilter === 'ALL' || s.status === typeFilter;
+      return matchesSearch && matchesType;
+    });
+
+    const statsById = {};
+    filtered.forEach(s => { statsById[s.id] = getStudentStats(s.id); });
+    filtered.sort(makeComparator(statsById, journalNumbers));
+    updateSortIndicators();
+
+    filtered.forEach((student, index) => {
+      const studentAbsences = getFilteredAbsencesForStudent(student.id);
+
+      let unexcusedHours = 0;
+      let excusedHours = 0;
+
+      studentAbsences.forEach(a => {
+        if (a.isExcused) excusedHours += Number(a.totalHours);
+        else unexcusedHours += Number(a.totalHours);
+      });
+
+      // Неуваж. часы: 0-4 — зелёный, 5-8 — жёлтый, 9+ — красный
+      let hoursClass = 'hours-green';
+      if (unexcusedHours >= 9) hoursClass = 'hours-danger';
+      else if (unexcusedHours >= 5) hoursClass = 'hours-warning';
+
+      const row = document.createElement('div');
+      row.className = 'student-row';
+      row.innerHTML = `
+        <span class="col-num journal-num">${journalNumbers[student.id]}</span>
+        <span class="col-name">
+          <a class="student-name" onclick="openStudentHistory('${student.id}')">
+            ${student.lastName} ${student.firstName}
+          </a>${student.role ? `<span class="role-tag">${student.role}</span>` : ''}${student.isAdmin ? `<span class="admin-badge" title="Администратор журнала"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6c0 5.2 3.4 9.9 8 11 4.6-1.1 8-5.8 8-11V5l-8-3zm-1.2 13.2L7 11.4l1.4-1.4 2.4 2.4 4.8-4.8L17 9l-6.2 6.2z"/></svg></span>` : ''}
+        </span>
+        <span class="col-hours-values">
+          <span class="hours-circle ${hoursClass}">${unexcusedHours}</span>
+          <span class="uvazh-value">${excusedHours}</span>
+        </span>
+      `;
+      if (animateRows && index < 12) {
+        row.classList.add('fx-reveal');
+        row.style.setProperty('--fx-delay', `${index * 25}ms`);
+      }
+      tbody.appendChild(row);
+    });
+
+    updateAdminUI();
+  }
+
+  // --- Внести пропуски с Radio Buttons для предметов ---
+  const WEEKDAYS_FULL = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+
+  // Живая подпись под датой в форме "Внести пропуски" — чтобы сразу было видно,
+  // на какой день фактически вносится запись, а не только цифры в календаре
+  function updateAbsenceDateCaption() {
+    const input = document.getElementById('absenceDate');
+    const caption = document.getElementById('absenceDateCaption');
+    if (!input.value) { caption.innerText = ''; return; }
+    const d = new Date(input.value + 'T00:00:00');
+    if (isNaN(d.getTime())) { caption.innerText = ''; return; }
+    const weekday = WEEKDAYS_FULL[d.getDay()];
+    const dateStr = formatDateShort(d);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isFuture = d > today;
+    caption.innerText = `Пропуски вносятся за: ${weekday}, ${dateStr}${isFuture ? ' (дата в будущем)' : ''}`;
+    caption.className = 'small mt-1 ' + (isFuture ? 'text-warning' : 'text-secondary');
+  }
+
+  function openAddAbsenceModal() {
+    const journalNumbers = getJournalNumbers();
+    const ordered = [...appData.students].sort((a, b) => journalNumbers[a.id] - journalNumbers[b.id]);
+
+    const studentSelect = document.getElementById('absenceStudent');
+    studentSelect.innerHTML = ordered
+      .map(s => `<option value="${s.id}">${journalNumbers[s.id]}. ${s.lastName} ${s.firstName}</option>`)
+      .join('');
+
+    document.getElementById('absenceDate').valueAsDate = new Date();
+    updateAbsenceDateCaption();
+    document.getElementById('absenceHours').value = 2;
+    document.getElementById('absenceComment').value = '';
+    document.getElementById('absenceIsExcused').checked = false;
+    document.getElementById('absenceCertType').value = 'Больничный';
+    document.getElementById('absenceCertDueDate').value = '';
+    document.getElementById('absenceCertSubmitted').checked = false;
+    toggleCertFields();
+    document.getElementById('subjectContainer').innerHTML = '';
+
+    updateStudentSummaryCard();
+    renderSubjectPickers();
+    addAbsenceModal.show();
+  }
+
+  // Поля справки показываем только когда пропуск уважительный
+  function toggleCertFields() {
+    const isExcused = document.getElementById('absenceIsExcused').checked;
+    document.getElementById('certFieldsContainer').classList.toggle('d-none', !isExcused);
+  }
+
+  // --- Внести пропуски группой: один предмет/день сразу нескольким студентам ---
+  let groupSelectedStudentIds = new Set();
+
+  function openGroupAbsenceModal() {
+    document.getElementById('groupAbsenceSubject').innerHTML = appData.subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+    document.getElementById('groupAbsenceDate').valueAsDate = new Date();
+    document.getElementById('groupAbsenceHours').value = 2;
+    document.getElementById('groupAbsenceComment').value = '';
+    document.getElementById('groupAbsenceIsExcused').checked = false;
+    document.getElementById('groupCertType').value = 'Больничный';
+    document.getElementById('groupCertDueDate').value = '';
+    document.getElementById('groupCertSubmitted').checked = false;
+    document.getElementById('groupStudentSearch').value = '';
+    toggleGroupCertFields();
+
+    groupSelectedStudentIds = new Set();
+    renderGroupStudentsList();
+    groupAbsenceModal.show();
+  }
+
+  function setGroupQuickHours(val) {
+    document.getElementById('groupAbsenceHours').value = val;
+  }
+
+  function toggleGroupCertFields() {
+    const isExcused = document.getElementById('groupAbsenceIsExcused').checked;
+    document.getElementById('groupCertFieldsContainer').classList.toggle('d-none', !isExcused);
+  }
+
+  function renderGroupStudentsList() {
+    const search = document.getElementById('groupStudentSearch').value.toLowerCase();
+    const journalNumbers = getJournalNumbers();
+    const ordered = [...appData.students].sort((a, b) => journalNumbers[a.id] - journalNumbers[b.id]);
+    const filtered = ordered.filter(s => `${s.lastName} ${s.firstName}`.toLowerCase().includes(search));
+
+    const container = document.getElementById('groupStudentsList');
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="text-secondary small p-1">Никого не найдено</div>';
+    } else {
+      container.innerHTML = filtered.map(s => `
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input group-student-check" id="gs_${s.id}" value="${s.id}"
+                 ${groupSelectedStudentIds.has(s.id) ? 'checked' : ''} onchange="toggleGroupStudent('${s.id}', this.checked)">
+          <label class="form-check-label text-white small" for="gs_${s.id}">${journalNumbers[s.id]}. ${s.lastName} ${s.firstName}</label>
+        </div>
+      `).join('');
+    }
+    updateGroupSelectedCount();
+  }
+
+  function toggleGroupStudent(id, checked) {
+    if (checked) groupSelectedStudentIds.add(id);
+    else groupSelectedStudentIds.delete(id);
+    updateGroupSelectedCount();
+  }
+
+  // "Все"/"Никто" применяются к тем, кто сейчас виден под текущим поиском — не к всей группе целиком
+  function setAllGroupStudents(select) {
+    document.querySelectorAll('.group-student-check').forEach(cb => {
+      cb.checked = select;
+      if (select) groupSelectedStudentIds.add(cb.value);
+      else groupSelectedStudentIds.delete(cb.value);
+    });
+    updateGroupSelectedCount();
+  }
+
+  function updateGroupSelectedCount() {
+    document.getElementById('groupSelectedCount').innerText = groupSelectedStudentIds.size;
+  }
+
+  async function submitGroupAbsence() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+
+    const subject = document.getElementById('groupAbsenceSubject').value;
+    const date = document.getElementById('groupAbsenceDate').value;
+    const hours = parseInt(document.getElementById('groupAbsenceHours').value) || 0;
+    const isExcused = document.getElementById('groupAbsenceIsExcused').checked;
+    const comment = document.getElementById('groupAbsenceComment').value.trim();
+
+    if (!date) return showAlert('Укажите дату пропуска');
+    if (hours < 1) return showAlert('Укажите количество часов');
+    if (groupSelectedStudentIds.size === 0) return showAlert('Отметьте хотя бы одного студента');
+
+    const certType = document.getElementById('groupCertType').value;
+    const certDueDate = document.getElementById('groupCertDueDate').value || null;
+    const certSubmitted = document.getElementById('groupCertSubmitted').checked;
+
+    const stamp = Date.now();
+    let i = 0;
+    groupSelectedStudentIds.forEach(studentId => {
+      const record = {
+        id: 'abs-' + stamp + '-g' + i + '-' + Math.floor(Math.random() * 1000),
+        studentId,
+        date,
+        totalHours: hours,
+        isExcused,
+        subject,
+        comment
+      };
+      if (isExcused) {
+        record.certType = certType;
+        record.certDueDate = certDueDate;
+        record.certSubmitted = certSubmitted;
+      }
+      appData.absences.push(record);
+      i++;
+    });
+
+    await saveDataToGitHub(`Внесены пропуски группой (${groupSelectedStudentIds.size} студ.)`);
+    groupAbsenceModal.hide();
+  }
+
+  // --- Один список предметов: одна пара (2 ч) на предмет ---
+  // 2 ч = 1 предмет, 4 ч = 2 предмета, 6 ч = 3, 8 ч = 4
+  function subjectLimit(hours) {
+    return Math.max(1, Math.ceil(hours / 2));
+  }
+
+  function getAbsenceHours() {
+    let hours = parseInt(document.getElementById('absenceHours').value) || 2;
+    return hours < 1 ? 1 : hours;
+  }
+
+  function renderSubjectPickers() {
+    const hours = getAbsenceHours();
+    const limit = subjectLimit(hours);
+    const container = document.getElementById('subjectContainer');
+
+    // отмеченное сохраняем при смене часов, но не больше нового лимита
+    const checkedBefore = Array.from(container.querySelectorAll('.subject-check:checked'))
+      .map(el => el.value)
+      .slice(0, limit);
+
+    const itemsHtml = appData.subjects.map((s, idx) => `
+      <div class="form-check my-1">
+        <input class="form-check-input subject-check" type="checkbox" id="sub_${idx}" value="${s}"
+               ${checkedBefore.includes(s) ? 'checked' : ''} onchange="updateSubjectHint()">
+        <label class="form-check-label text-white small" for="sub_${idx}">${s}</label>
+      </div>
+    `).join('');
+
+    container.innerHTML = `
+      <div class="subject-slot-card">
+        <label class="form-label text-secondary small fw-bold mb-2">Предметы (${hours} ч — ${limit} ${pairWord(limit)}):</label>
+        <div class="ps-1">${itemsHtml}</div>
+        <div class="subject-hint text-secondary" id="subjectHint"></div>
+      </div>
+    `;
+
+    updateSubjectHint();
+  }
+
+  function pairWord(n) {
+    if (n % 10 === 1 && n % 100 !== 11) return 'предмет';
+    if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'предмета';
+    return 'предметов';
+  }
+
+  function getSelectedSubjects() {
+    return Array.from(document.querySelectorAll('.subject-check:checked')).map(el => el.value);
+  }
+
+  // Каждому предмету — по 2 часа. Остаток (нечётный ввод) уходит первым предметам
+  function splitHours(total, parts) {
+    const base = Math.floor(total / parts);
+    const rest = total % parts;
+    return Array.from({ length: parts }, (_, i) => base + (i < rest ? 1 : 0));
+  }
+
+  function updateSubjectHint() {
+    const hint = document.getElementById('subjectHint');
+    if (!hint) return;
+
+    const hours = getAbsenceHours();
+    const limit = subjectLimit(hours);
+    const boxes = Array.from(document.querySelectorAll('.subject-check'));
+    const selectedCount = boxes.filter(b => b.checked).length;
+
+    // лимит выбран — остальные предметы гасим
+    boxes.forEach(b => {
+      b.disabled = !b.checked && selectedCount >= limit;
+      const label = b.nextElementSibling;
+      if (label) label.classList.toggle('subject-off', b.disabled);
+    });
+
+    if (selectedCount === 0) {
+      hint.className = 'subject-hint text-secondary';
+      hint.innerText = `${hours} ч — отметьте ${limit} ${pairWord(limit)}.`;
+      return;
+    }
+
+    const parts = splitHours(hours, selectedCount).join(' + ');
+
+    if (selectedCount < limit) {
+      hint.className = 'subject-hint text-warning';
+      hint.innerText = `Отмечено ${selectedCount} из ${limit}. Если оставить так, часы разделятся: ${parts}.`;
+    } else {
+      hint.className = 'subject-hint text-success';
+      hint.innerText = `Отмечено ${selectedCount} из ${limit} — по часам: ${parts}.`;
+    }
+  }
+
+  function setQuickHours(val) {
+    document.getElementById('absenceHours').value = val;
+    renderSubjectPickers();
+  }
+
+  function updateStudentSummaryCard() {
+    const studentId = document.getElementById('absenceStudent').value;
+    const student = appData.students.find(s => s.id === studentId);
+    if (!student) return;
+
+    document.getElementById('modalStudentNameSummary').innerText = `${student.lastName} ${student.firstName}`;
+    
+    const unexcused = appData.absences
+      .filter(a => a.studentId === studentId && !a.isExcused)
+      .reduce((sum, a) => sum + Number(a.totalHours), 0);
+
+    document.getElementById('modalStudentHoursSummary').innerText = `${unexcused} часов`;
+  }
+
+  async function submitAbsence() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+
+    const studentId = document.getElementById('absenceStudent').value;
+    const date = document.getElementById('absenceDate').value;
+    const isExcused = document.getElementById('absenceIsExcused').checked;
+    const comment = document.getElementById('absenceComment').value.trim();
+
+    if (!date) return showAlert('Укажите дату пропуска');
+
+    const hours = getAbsenceHours();
+    const limit = subjectLimit(hours);
+    const selected = getSelectedSubjects();
+
+    if (selected.length === 0) return showAlert('Отметьте хотя бы один предмет');
+    if (selected.length > limit) {
+      return showAlert(`При ${hours} ч можно отметить не больше ${limit} ${pairWord(limit)}`);
+    }
+
+    // Справка — одна на весь день (одну причину пропуска), а не на предмет
+    const certType = document.getElementById('absenceCertType').value;
+    const certDueDate = document.getElementById('absenceCertDueDate').value || null;
+    const certSubmitted = document.getElementById('absenceCertSubmitted').checked;
+
+    const parts = splitHours(hours, selected.length);
+    const stamp = Date.now();
+
+    selected.forEach((subject, i) => {
+      const record = {
+        id: 'abs-' + stamp + '-' + i + '-' + Math.floor(Math.random() * 1000),
+        studentId,
+        date,
+        totalHours: parts[i],
+        isExcused,
+        subject,
+        comment
+      };
+      if (isExcused) {
+        record.certType = certType;
+        record.certDueDate = certDueDate;
+        record.certSubmitted = certSubmitted;
+      }
+      appData.absences.push(record);
+    });
+
+    await saveDataToGitHub('Добавлены пропуски по предметам');
+    addAbsenceModal.hide();
+  }
+
+  // --- История и расширенная статистика по студенту ---
+  function openStudentHistory(studentId) {
+    const student = appData.students.find(s => s.id === studentId);
+    if (!student) return;
+    currentHistoryStudentId = studentId;
+
+    document.getElementById('historyModalTitle').innerText = `${student.lastName} ${student.firstName} (${student.status})`;
+
+    const studentAbs = appData.absences.filter(a => a.studentId === studentId);
+
+    const currentMonth = new Date().getMonth();
+    let monthUnexcused = 0, monthExcused = 0;
+    let totalUnexcused = 0, totalExcused = 0;
+
+    studentAbs.forEach(a => {
+      const h = Number(a.totalHours);
+      const absDate = new Date(a.date);
+      const isCurrentMonth = absDate.getMonth() === currentMonth;
+
+      if (a.isExcused) {
+        totalExcused += h;
+        if (isCurrentMonth) monthExcused += h;
+      } else {
+        totalUnexcused += h;
+        if (isCurrentMonth) monthUnexcused += h;
+      }
+    });
+
+    document.getElementById('historyMonthUnexcused').innerText = `${monthUnexcused} ч`;
+    document.getElementById('historyMonthExcused').innerText = `${monthExcused} ч`;
+    document.getElementById('historyTotalUnexcused').innerText = `${totalUnexcused} ч`;
+    document.getElementById('historyTotalExcused').innerText = `${totalExcused} ч`;
+
+    if (githubToken) renderStudentDetails(studentId);
+    updateAdminUI();
+    studentHistoryModal.show();
+  }
+
+  // Подробная разбивка по предметам + полный список записей (для админа — сразу в окне студента)
+  function buildSubjectBreakdown(studentAbs) {
+    const subjectMap = {};
+    appData.subjects.forEach(sub => { subjectMap[sub] = { unexcused: 0, excused: 0 }; });
+    studentAbs.forEach(a => {
+      const h = Number(a.totalHours);
+      const subName = a.subject || (a.subjects ? a.subjects[0] : 'Прочее');
+      if (!subjectMap[subName]) subjectMap[subName] = { unexcused: 0, excused: 0 };
+      if (a.isExcused) subjectMap[subName].excused += h;
+      else subjectMap[subName].unexcused += h;
+    });
+    return subjectMap;
+  }
+
+  // Бейдж по справке для уважительного пропуска: сдана / просрочена / ожидается
+  function certStatusBadge(a) {
+    if (!a.isExcused || !a.certType) return '';
+    if (a.certSubmitted) {
+      return `<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50">${a.certType}: сдана</span>`;
+    }
+    if (a.certDueDate) {
+      const due = new Date(a.certDueDate);
+      if (!isNaN(due.getTime()) && due < new Date()) {
+        return `<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50">${a.certType}: просрочена (до ${formatDateShort(due)})</span>`;
+      }
+      return `<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50">${a.certType}: ожидается до ${formatDateShort(due)}</span>`;
+    }
+    return `<span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-50">${a.certType}: не сдана</span>`;
+  }
+
+  function renderStudentDetails(studentId) {
+    const studentAbs = appData.absences.filter(a => a.studentId === studentId);
+
+    const subjectMap = buildSubjectBreakdown(studentAbs);
+    const subjectBody = document.getElementById('detailedStatsSubjectBody');
+    subjectBody.innerHTML = '';
+    Object.keys(subjectMap).forEach(sub => {
+      const u = subjectMap[sub].unexcused;
+      const e = subjectMap[sub].excused;
+      if (u > 0 || e > 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-start fw-bold text-white">${sub}</td>
+          <td class="text-warning">${u}</td>
+          <td class="text-success">${e}</td>
+          <td class="fw-bold">${u + e}</td>
+        `;
+        subjectBody.appendChild(tr);
+      }
+    });
+
+    const listEl = document.getElementById('detailedStatsList');
+    listEl.innerHTML = '';
+    const pendingCerts = studentAbs.filter(a => a.isExcused && !a.certSubmitted).length;
+    document.getElementById('certConfirmAllBtn').classList.toggle('d-none', pendingCerts === 0);
+    if (studentAbs.length === 0) {
+      listEl.innerHTML = '<div class="p-3 text-secondary text-center">Пропусков нет</div>';
+    } else {
+      const sorted = [...studentAbs].sort((a, b) => new Date(b.date) - new Date(a.date));
+      sorted.forEach(a => {
+        const item = document.createElement('div');
+        item.className = 'p-3 border-bottom border-secondary border-opacity-25';
+        item.dataset.absRow = a.id;
+        const subName = a.subject || (a.subjects ? a.subjects.join(', ') : 'Предмет не указан');
+        const badge = certStatusBadge(a);
+        // Уважительный пропуск: справку можно отметить принесённой или снять отметку, если нажали по ошибке
+        const certBtn = !a.isExcused ? ''
+          : a.certSubmitted
+            ? `<button type="button" class="btn btn-sm btn-link text-secondary p-0 cert-undo-btn" data-abs-id="${a.id}" onclick="setCertSubmitted('${a.id}', false)">Отменить отметку</button>`
+            : `<button type="button" class="btn btn-sm btn-outline-success cert-confirm-btn" data-abs-id="${a.id}" onclick="setCertSubmitted('${a.id}', true)">Справка принесена</button>`;
+        item.innerHTML = `
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <div class="fw-bold text-white">${formatDateShort(a.date)} — ${subName} (${a.totalHours} ч)</div>
+              <div class="small text-secondary">${a.comment || 'Без комментария'}</div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+              <span class="badge ${a.isExcused ? 'bg-success' : 'bg-danger'}">${a.isExcused ? 'Уважительный' : 'Неуважительный'}</span>
+              <button class="btn btn-sm btn-outline-danger" title="Удалить эту запись" onclick="deleteDetailedAbsence('${a.id}')">✕</button>
+            </div>
+          </div>
+          ${badge || certBtn ? `<div class="mt-2 d-flex flex-wrap align-items-center gap-2">${badge}${certBtn}</div>` : ''}
+        `;
+        listEl.appendChild(item);
+      });
+    }
+  }
+
+  // --- Справки по уважительным пропускам (только админ) ---
+  // Отметить справку принесённой (submitted = true) или снять отметку (false)
+  async function setCertSubmitted(absId, submitted) {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+    const a = appData.absences.find(x => x.id === absId);
+    if (!a) return;
+    const question = submitted ? 'Отметить, что справка принесена?' : 'Снять отметку «справка принесена»?';
+    if (!(await showConfirm(question))) return;
+    if (submitted && !a.certType) a.certType = 'Справка';
+    a.certSubmitted = submitted;
+    await saveDataToGitHub(submitted ? 'Справка принесена' : 'Снята отметка о справке');
+    renderExtendedStats();
+    openStudentHistory(currentHistoryStudentId);
+  }
+
+  // Отметить принесёнными сразу все справки студента — одним сохранением
+  async function confirmAllCerts() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+    const pending = appData.absences.filter(a => a.studentId === currentHistoryStudentId && a.isExcused && !a.certSubmitted);
+    if (pending.length === 0) return;
+    if (!(await showConfirm(`Отметить принесёнными все справки студента (${pending.length})?`))) return;
+    pending.forEach(a => {
+      if (!a.certType) a.certType = 'Справка';
+      a.certSubmitted = true;
+    });
+    await saveDataToGitHub(`Справки приняты (${pending.length})`);
+    renderExtendedStats();
+    openStudentHistory(currentHistoryStudentId);
+  }
+
+  // Удаление конкретной записи пропуска прямо из окна студента
+  async function deleteDetailedAbsence(absId) {
+    if (!(await showConfirm('Удалить эту запись о пропуске?'))) return;
+    appData.absences = appData.absences.filter(a => a.id !== absId);
+    await saveDataToGitHub('Удалён пропуск (подробная статистика)');
+    openStudentHistory(currentHistoryStudentId);
+  }
+
+  // Кнопки "Изменить"/"Удалить" в футере окна истории (переехали сюда со столбца "Действия")
+  function editCurrentHistoryStudent() {
+    if (!currentHistoryStudentId) return;
+    const id = currentHistoryStudentId;
+    studentHistoryModal.hide();
+    openEditStudentModal(id);
+  }
+
+  async function deleteCurrentHistoryStudent() {
+    if (!currentHistoryStudentId) return;
+    const id = currentHistoryStudentId;
+    studentHistoryModal.hide();
+    await deleteStudent(id);
+  }
+
+  // --- Добавить / Удалить / Редактировать студента ---
+  function openAddStudentModal() {
+    document.getElementById('studentEditTitle').innerText = 'Добавить студента';
+    document.getElementById('editStudentId').value = '';
+    document.getElementById('studentLastName').value = '';
+    document.getElementById('studentFirstName').value = '';
+    document.getElementById('studentStatus').value = 'Бюджет';
+    document.getElementById('studentRole').value = '';
+    document.getElementById('studentTelegramUsername').value = '';
+    document.getElementById('studentIsAdmin').checked = false;
+    populateAbsenceManageSection(null);
+    studentEditModal.show();
+  }
+
+  function openEditStudentModal(id) {
+    const student = appData.students.find(s => s.id === id);
+    if (!student) return;
+    document.getElementById('studentEditTitle').innerText = 'Редактировать студента';
+    document.getElementById('editStudentId').value = student.id;
+    document.getElementById('studentLastName').value = student.lastName;
+    document.getElementById('studentFirstName').value = student.firstName;
+    document.getElementById('studentStatus').value = student.status;
+    document.getElementById('studentRole').value = student.role || '';
+    document.getElementById('studentTelegramUsername').value = student.telegramUsername || '';
+    document.getElementById('studentIsAdmin').checked = !!student.isAdmin;
+    populateAbsenceManageSection(student.id);
+    studentEditModal.show();
+  }
+
+  // Заполняет выпадающие списки "удалить за день" / "удалить по предмету"
+  // в карточке студента данными его текущих пропусков (или прячет блок, если удалять нечего)
+  function populateAbsenceManageSection(studentId) {
+    const section = document.getElementById('studentAbsenceManageSection');
+    const abs = studentId ? appData.absences.filter(a => a.studentId === studentId) : [];
+
+    if (!studentId || abs.length === 0) {
+      section.classList.add('d-none');
+      return;
+    }
+    section.classList.remove('d-none');
+
+    const dateMap = {};
+    const subjMap = {};
+    abs.forEach(a => {
+      const h = Number(a.totalHours) || 0;
+      dateMap[a.date] = (dateMap[a.date] || 0) + h;
+      const subj = a.subject || 'Без предмета';
+      subjMap[subj] = (subjMap[subj] || 0) + h;
+    });
+
+    const dates = Object.keys(dateMap).sort((a, b) => new Date(b) - new Date(a));
+    document.getElementById('deleteAbsByDateSelect').innerHTML = dates
+      .map(d => `<option value="${d}">${formatDateShort(d)} (${dateMap[d]} ч)</option>`)
+      .join('');
+
+    const subjects = Object.keys(subjMap).sort((a, b) => a.localeCompare(b, 'ru'));
+    document.getElementById('deleteAbsBySubjectSelect').innerHTML = subjects
+      .map(s => `<option value="${s}">${s} (${subjMap[s]} ч)</option>`)
+      .join('');
+  }
+
+  async function deleteAbsencesByDate() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+    const studentId = document.getElementById('editStudentId').value;
+    const date = document.getElementById('deleteAbsByDateSelect').value;
+    if (!studentId || !date) return;
+
+    const count = appData.absences.filter(a => a.studentId === studentId && a.date === date).length;
+    if (!(await showConfirm(`Удалить ${count} запис${count === 1 ? 'ь' : 'и'} пропуска за ${formatDateShort(date)}?`))) return;
+
+    appData.absences = appData.absences.filter(a => !(a.studentId === studentId && a.date === date));
+    await saveDataToGitHub('Удалены пропуски за день');
+    populateAbsenceManageSection(studentId);
+  }
+
+  async function deleteAbsencesBySubject() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+    const studentId = document.getElementById('editStudentId').value;
+    const subject = document.getElementById('deleteAbsBySubjectSelect').value;
+    if (!studentId || !subject) return;
+
+    const count = appData.absences.filter(a => a.studentId === studentId && (a.subject || 'Без предмета') === subject).length;
+    if (!(await showConfirm(`Удалить ${count} запис${count === 1 ? 'ь' : 'и'} пропуска по предмету «${subject}»?`))) return;
+
+    appData.absences = appData.absences.filter(a => !(a.studentId === studentId && (a.subject || 'Без предмета') === subject));
+    await saveDataToGitHub('Удалены пропуски по предмету');
+    populateAbsenceManageSection(studentId);
+  }
+
+  async function saveStudent() {
+    if (!githubToken) return showAlert('Требуется авторизация администратора');
+    const id = document.getElementById('editStudentId').value;
+    const lastName = document.getElementById('studentLastName').value.trim();
+    const firstName = document.getElementById('studentFirstName').value.trim();
+    const status = document.getElementById('studentStatus').value;
+    const role = document.getElementById('studentRole').value.trim();
+    const telegramUsername = document.getElementById('studentTelegramUsername').value.trim().replace(/^@/, '');
+    const isAdmin = document.getElementById('studentIsAdmin').checked;
+
+    if (!lastName || !firstName) return showAlert('Заполните ФИО студента');
+
+    if (id) {
+      const student = appData.students.find(s => s.id === id);
+      if (student) {
+        student.lastName = lastName;
+        student.firstName = firstName;
+        student.status = status;
+        if (role) student.role = role; else delete student.role;
+        if (telegramUsername) student.telegramUsername = telegramUsername; else delete student.telegramUsername;
+        if (isAdmin) student.isAdmin = true; else delete student.isAdmin;
+      }
+    } else {
+      const newStudent = {
+        id: 'st-' + Date.now(),
+        lastName,
+        firstName,
+        status
+      };
+      if (role) newStudent.role = role;
+      if (telegramUsername) newStudent.telegramUsername = telegramUsername;
+      if (isAdmin) newStudent.isAdmin = true;
+      appData.students.push(newStudent);
+    }
+
+    await saveDataToGitHub('Обновлен список студентов');
+    studentEditModal.hide();
+  }
+
+  async function deleteStudent(id) {
+    if (!(await showConfirm('Вы действительно хотите удалить студента и все его пропуски?'))) return;
+    appData.students = appData.students.filter(s => s.id !== id);
+    appData.absences = appData.absences.filter(a => a.studentId !== id);
+    await saveDataToGitHub('Удален студент');
+  }
+
+  // --- Выгрузка в CSV и Очистка месяца ---
+  function exportToCSV() {
+    let csv = '\uFEFFФИО;Статус;Всего неуважительных часов;Всего уважительных часов\n';
+    appData.students.forEach(s => {
+      const abs = appData.absences.filter(a => a.studentId === s.id);
+      let u = 0, e = 0;
+      abs.forEach(a => {
+        if (a.isExcused) e += Number(a.totalHours);
+        else u += Number(a.totalHours);
+      });
+      csv += `"${s.lastName} ${s.firstName}";"${s.status}";${u};${e}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Пропуски_24ДММ-2_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+  }
+
+  // --- Сохранение в GitHub ---
+  async function saveDataToGitHub(message) {
+  try {
+    const getFileRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
+      headers: { Authorization: `Bearer ${githubToken}` }
+    });
+
+    if (!getFileRes.ok) {
+      const errJson = await getFileRes.json();
+      haptic('error');
+      showAlert('Ошибка получения файла с GitHub: ' + (errJson.message || getFileRes.statusText));
+      return false;
+    }
+
+    const fileData = await getFileRes.json();
+    appData.lastUpdated = new Date().toISOString();
+    const updatedJsonStr = JSON.stringify(appData, null, 2);
+    const utf8Bytes = new TextEncoder().encode(updatedJsonStr);
+    const base64Content = btoa(String.fromCharCode(...utf8Bytes));
+
+    const putRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: message,
+        content: base64Content,
+        sha: fileData.sha
+      })
+    });
+
+    if (putRes.ok) {
+      updateStats();
+      renderTable();
+      haptic('success');
+      showAlert('Изменения успешно сохранены!');
+      return true;
+    } else {
+      const errorData = await putRes.json();
+      haptic('error');
+      showAlert('Ошибка сохранения на GitHub: ' + errorData.message);
+      return false;
+    }
+  } catch (err) {
+    console.error(err);
+    haptic('error');
+    showAlert('Сетевая ошибка при обращении к GitHub API. Проверьте подключение или VPN.');
+    return false;
+  }
+}
+
+  // --- Кнопки разделов (заготовки): пока показывают сообщение «в разработке» ---
+  const FEATURE_IN_DEV_MESSAGE = 'Данная функция ещё в разработке. Ожидайте, пожалуйста, дальнейших изменений.';
+  let featurePopupOpen = false;
+
+  function showFeatureInDevelopment() {
+    if (featurePopupOpen) return;
+
+    // Внутри Telegram — родное окно с заголовком «Ошибка», в обычном браузере — alert
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg && tg.initData && tg.isVersionAtLeast && tg.isVersionAtLeast('6.2')) {
+      try {
+        featurePopupOpen = true;
+        tg.showPopup(
+          { title: 'Ошибка', message: FEATURE_IN_DEV_MESSAGE, buttons: [{ type: 'close' }] },
+          () => { featurePopupOpen = false; }
+        );
+        return;
+      } catch (e) {
+        featurePopupOpen = false;
+      }
+    }
+    showAlert(FEATURE_IN_DEV_MESSAGE);
+  }
+
+  // --- Авторизация ---
+  // Вход и выход администратора — в личном кабинете (строка «Админ-панель», cabinet.html).
+  // Здесь только читаем токен из localStorage gh_pat и показываем инструменты администратора.
+  function updateAdminUI() {
+    const adminElements = document.querySelectorAll('.admin-only');
+    // Кнопки разделов — только для обычных пользователей
+    document.querySelectorAll('.user-only').forEach(el => el.classList.toggle('d-none', !!githubToken));
+    const appTitle = document.getElementById('appTitle');
+
+    if (githubToken) {
+      adminElements.forEach(el => el.classList.remove('d-none'));
+      if (appTitle) appTitle.innerText = 'Admin Workspace';
+    } else {
+      adminElements.forEach(el => el.classList.add('d-none'));
+      if (appTitle) appTitle.innerText = 'Журнал';
+    }
+  }
+
+  init();
+
+  // Дорисовать после штатной функции страницы (сами функции не меняются)
+  function afterCall(name, fn) {
+    const orig = window[name];
+    window[name] = function () { const r = orig.apply(this, arguments); try { fn(); } catch (e) { console.error(e); } return r; };
+  }
+
+  // --- Вариант A: колокольчик со счётчиком непрочитанных общих объявлений → лист снизу ---
+  function readSeenAnnouncements() {
+    try { return JSON.parse(localStorage.getItem('seen_announcements') || '[]'); } catch (e) { return []; }
+  }
+  function generalAnnouncementsList() { return (appData.announcements || []).filter(a => a.targetType === 'ALL'); }
+  function updateAnnouncementsBell() {
+    const all = generalAnnouncementsList();
+    const seen = readSeenAnnouncements();
+    const unread = all.filter(a => !seen.includes(a.id)).length;
+    const badge = document.getElementById('announcementsBellCount');
+    badge.innerText = unread > 9 ? '9+' : String(unread);
+    badge.classList.toggle('d-none', unread === 0);
+    document.getElementById('announcementsBell').classList.toggle('has-unread', unread > 0);
+    document.getElementById('announcementsBell').setAttribute('aria-label', unread ? `Объявления, непрочитанных: ${unread}` : 'Объявления');
+    document.getElementById('announcementsEmpty').classList.toggle('d-none', all.length > 0);
+  }
+  function openAnnouncementsSheet() {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('announcementsSheet')).show();
+    const ids = generalAnnouncementsList().map(a => a.id);
+    const merged = Array.from(new Set(readSeenAnnouncements().concat(ids)));
+    try { localStorage.setItem('seen_announcements', JSON.stringify(merged)); } catch (e) {}
+    updateAnnouncementsBell();
+  }
+  afterCall('renderGeneralAnnouncements', updateAnnouncementsBell);
+
+  // Регистрация service worker для PWA (установка на главный экран, работа не только внутри Telegram)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.error('SW registration failed:', err));
+    });
+  }
+</script>
+<!-- Нижняя панель навигации (моб.) -->
+<nav class="bottom-tabbar" aria-label="Разделы">
+  <a class="tabbar-item active" aria-current="page" href="#stats" data-view="stats" data-tab-home>
+    <span class="tab-selection"></span>
+    <svg class="tab-ico" viewBox="0 0 28 28" fill="currentColor" aria-hidden="true"><path d="M18.8738 2C19.57 2 20.2377 2.27656 20.73 2.76884C21.2223 3.26113 21.4988 3.92881 21.4988 4.625V22.7083C21.4988 23.4045 21.2223 24.0722 20.73 24.5645C20.2377 25.0568 19.57 25.3333 18.8738 25.3333H6.625C5.92881 25.3333 5.26113 25.0568 4.76884 24.5645C4.27656 24.0722 4 23.4045 4 22.7083V4.625C4 3.92881 4.27656 3.26113 4.76884 2.76884C5.26113 2.27656 5.92881 2 6.625 2H18.8738ZM22.6667 17.169H23.5417C23.7531 17.169 23.9574 17.2456 24.1168 17.3846C24.2761 17.5235 24.3797 17.7155 24.4085 17.925L24.4167 18.044V19.7917C24.4167 20.0031 24.3401 20.2074 24.2011 20.3668C24.0621 20.5261 23.8701 20.6297 23.6607 20.6585L23.5417 20.6667H22.6667V17.169ZM22.6667 12.5023H23.5417C23.7531 12.5023 23.9574 12.5789 24.1168 12.7179C24.2761 12.8569 24.3797 13.0489 24.4085 13.2583L24.4167 13.3773V15.125C24.4167 15.3364 24.3401 15.5407 24.2011 15.7001C24.0621 15.8594 23.8701 15.9631 23.6607 15.9918L23.5417 16H22.6667V12.5023ZM22.6667 7.83567H23.5417C23.7531 7.83568 23.9574 7.91225 24.1168 8.05123C24.2761 8.19021 24.3797 8.38219 24.4085 8.59167L24.4167 8.71067V10.4583C24.4167 10.6698 24.3401 10.8741 24.2011 11.0334C24.0621 11.1928 23.8701 11.2964 23.6607 11.3252L23.5417 11.3333H22.6667V7.83567ZM16.5463 6.07983H8.95833C8.74671 6.07988 8.54228 6.15662 8.3829 6.29583C8.22352 6.43505 8.12 6.62731 8.0915 6.837L8.08333 6.95483V8.7095C8.08333 9.15283 8.4135 9.518 8.8405 9.57633L8.95833 9.5845H16.5452C16.7566 9.58449 16.9609 9.50792 17.1203 9.36894C17.2796 9.22996 17.3832 9.03798 17.412 8.8285L17.4202 8.7095V6.95483C17.4202 6.72277 17.328 6.50021 17.1639 6.33612C16.9998 6.17202 16.7784 6.07983 16.5463 6.07983Z"/></svg>
+    <span>Статистика</span>
+  </a>
+  <a class="tabbar-item" href="#teachers" data-view="teachers" aria-label="Преподаватели" onclick="openTeachersList(); return false;">
+    <span class="tab-selection"></span>
+    <svg class="tab-ico" viewBox="0 0 28 28" fill="currentColor" aria-hidden="true"><path d="M14 20.125C13.8477 20.125 13.698 20.0852 13.5658 20.0096L5.90625 15.6319C5.83969 15.5934 5.76419 15.5732 5.68734 15.5732C5.61049 15.5733 5.535 15.5935 5.46847 15.632C5.40194 15.6705 5.34672 15.7258 5.30837 15.7924C5.27002 15.859 5.24989 15.9345 5.25 16.0114V20.125C5.24987 20.2812 5.29154 20.4345 5.37068 20.5691C5.44983 20.7038 5.56356 20.8148 5.70008 20.8906L13.5751 25.2656C13.7051 25.3378 13.8513 25.3757 14 25.3757C14.1487 25.3757 14.2949 25.3378 14.4249 25.2656L22.2999 20.8906C22.4364 20.8148 22.5502 20.7038 22.6293 20.5691C22.7085 20.4345 22.7501 20.2812 22.75 20.125V16.0114C22.7501 15.9345 22.73 15.859 22.6916 15.7924C22.6533 15.7258 22.5981 15.6705 22.5315 15.632C22.465 15.5935 22.3895 15.5733 22.3127 15.5732C22.2358 15.5732 22.1603 15.5934 22.0938 15.6319L14.4342 20.0096C14.302 20.0852 14.1523 20.125 14 20.125Z"/><path d="M27.1207 10.4179V10.4119C27.1065 10.2732 27.0594 10.1399 26.9833 10.0231C26.9072 9.90627 26.8043 9.80933 26.6832 9.74034L14.4332 2.74034C14.3009 2.66476 14.1513 2.625 13.9989 2.625C13.8466 2.625 13.697 2.66476 13.5647 2.74034L1.31472 9.74034C1.18084 9.81689 1.06957 9.92746 0.992175 10.0609C0.914784 10.1943 0.874023 10.3457 0.874023 10.5C0.874023 10.6542 0.914784 10.8057 0.992175 10.939C1.06957 11.0724 1.18084 11.183 1.31472 11.2596L13.5647 18.2596C13.697 18.3351 13.8466 18.3749 13.9989 18.3749C14.1513 18.3749 14.3009 18.3351 14.4332 18.2596L25.211 12.1012C25.2276 12.0916 25.2465 12.0865 25.2658 12.0865C25.285 12.0866 25.3039 12.0917 25.3205 12.1013C25.3372 12.111 25.351 12.1248 25.3605 12.1415C25.3701 12.1582 25.3751 12.1771 25.375 12.1964V20.1003C25.375 20.5712 25.7371 20.9753 26.2079 20.9989C26.3262 21.0046 26.4445 20.9862 26.5555 20.9448C26.6665 20.9035 26.7679 20.84 26.8537 20.7583C26.9394 20.6766 27.0077 20.5784 27.0543 20.4695C27.101 20.3606 27.125 20.2434 27.125 20.125V10.5C27.1249 10.4726 27.1235 10.4452 27.1207 10.4179Z"/></svg>
+    <span class="lbl-full">Преподаватели</span><span class="lbl-short">Преподы</span>
+  </a>
+  <a class="tabbar-item" href="#deadlines" data-view="deadlines">
+    <span class="tab-selection"></span>
+    <svg class="tab-ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 1.5h6a1 1 0 1 1 0 2H9a1 1 0 0 1 0-2z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4.5a9 9 0 1 1 0 18a9 9 0 0 1 0-18zm0 3.5a1 1 0 0 0-1 1v4.6l2.8 2.8a1 1 0 0 0 1.4-1.4L13 12.8V9a1 1 0 0 0-1-1z"/></svg>
+    <span>Дедлайны</span>
+    <span id="deadlinesTabDot" class="tabbar-badge-dot d-none js-deadlines-dot"></span>
+  </a>
+  <a class="tabbar-item" href="cabinet.html">
+    <span class="tab-selection"></span>
+    <svg class="tab-ico" viewBox="0 0 28 28" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M13.8098 25.6652L14 25.6667C13.7425 25.6667 13.485 25.6583 13.2279 25.6416C12.9099 25.6207 12.5928 25.587 12.2775 25.5404C11.9112 25.4861 11.5476 25.4145 11.1882 25.3256C10.8338 25.2379 10.4838 25.1335 10.1392 25.0128L10.1373 25.0121C9.57 24.8131 9.019 24.5703 8.48933 24.2858C8.1134 24.084 7.74886 23.8617 7.39733 23.6198C7.00202 23.348 6.6238 23.0521 6.2648 22.7339C6.13937 22.6227 6.01634 22.5089 5.89577 22.3925C3.69925 20.2708 2.33337 17.2949 2.33337 14C2.33337 7.55674 7.55674 2.33337 14 2.33337C15.5321 2.33337 17.0492 2.63513 18.4647 3.22143C19.8801 3.80773 21.1663 4.66709 22.2496 5.75044C23.333 6.83379 24.1923 8.11991 24.7787 9.53538C25.365 10.9508 25.6667 12.4679 25.6667 14C25.6667 17.2951 24.3007 20.271 22.1042 22.3926C22.1041 22.3927 22.1041 22.393 22.1042 22.3932C21.5516 22.9266 20.948 23.4045 20.302 23.8199L20.293 23.8257C20.1465 23.9198 19.9979 24.0105 19.8473 24.0979L19.8314 24.1071C19.5679 24.2594 19.2985 24.4013 19.0239 24.5326C18.9165 24.5838 18.8083 24.6335 18.6994 24.6816C18.5858 24.7315 18.4714 24.7797 18.3564 24.8262C18.2448 24.871 18.1326 24.9142 18.0198 24.9557C17.9057 24.9975 17.791 25.0375 17.6758 25.0759C17.5625 25.1134 17.4486 25.1492 17.3343 25.1833C17.2131 25.2193 17.0914 25.2534 16.9691 25.2856C16.8501 25.3167 16.7307 25.346 16.6108 25.3735C16.4912 25.4008 16.3712 25.4262 16.2507 25.4498C15.7599 25.5457 15.2635 25.6099 14.7644 25.6421C14.6404 25.6501 14.5162 25.6562 14.392 25.6603L14.3896 25.6603C14.1964 25.6667 14.0031 25.6683 13.8098 25.6652ZM15.1667 18.6667H12.8334C10.9749 18.6667 9.34956 19.7603 8.60237 21.3593L8.51787 21.553L8.59099 21.6071C9.92077 22.5543 11.5095 23.1616 13.2304 23.3021C13.2817 23.3063 13.3332 23.3101 13.3848 23.3134L13.2375 23.3026C13.2876 23.3067 13.3378 23.3104 13.3882 23.3136L13.3848 23.3134C13.4347 23.3167 13.4846 23.3196 13.5346 23.322L13.3882 23.3136C13.4401 23.317 13.4922 23.32 13.5445 23.3224L13.5346 23.322C13.5721 23.3238 13.6097 23.3254 13.6472 23.3268L14 23.3334L14.1463 23.3323C14.2001 23.3315 14.2539 23.3302 14.3076 23.3285L14.16 23.332C14.2097 23.3312 14.2594 23.33 14.309 23.3283L14.3076 23.3284C14.3576 23.3268 14.4075 23.3248 14.4574 23.3224L14.309 23.3283C14.3604 23.3266 14.4118 23.3246 14.4632 23.3221L14.4574 23.3224C14.5093 23.3198 14.5611 23.3169 14.6127 23.3136L14.4632 23.3221C14.5137 23.3196 14.5642 23.3167 14.6147 23.3135L14.6127 23.3136C14.6633 23.3103 14.7137 23.3066 14.764 23.3026L14.6146 23.3135C14.666 23.3101 14.7174 23.3064 14.7687 23.3022L14.764 23.3026C14.8129 23.2986 14.8616 23.2942 14.9102 23.2896L14.7687 23.3022C14.8197 23.298 14.8706 23.2934 14.9215 23.2885L14.9102 23.2896C16.5736 23.1286 18.1092 22.5309 19.4011 21.6127L19.481 21.553L19.3978 21.3595C18.6833 19.83 17.1651 18.7628 15.4078 18.6729L15.1667 18.6667ZM14 4.66673C8.8454 4.66673 4.66673 8.8454 4.66673 14C4.66673 16.226 5.44597 18.27 6.74655 19.874C7.9512 17.7591 10.2258 16.3334 12.8334 16.3334H15.1667C17.7744 16.3334 20.049 17.7592 21.2534 19.8738C22.5541 18.27 23.3334 16.226 23.3334 14C23.3334 8.8454 19.1547 4.66673 14 4.66673ZM14 5.83337C16.5774 5.83337 18.6667 7.92271 18.6667 10.5C18.6667 12.9992 16.7021 15.0396 14.2329 15.161L14 15.1667C11.4227 15.1667 9.33337 13.0774 9.33337 10.5C9.33337 8.0008 11.298 5.96041 13.7671 5.83906L14 5.83337ZM14 8.16673C12.7114 8.16673 11.6667 9.21137 11.6667 10.5C11.6667 11.7887 12.7114 12.8334 14 12.8334C15.2887 12.8334 16.3334 11.7887 16.3334 10.5C16.3334 9.21137 15.2887 8.16673 14 8.16673Z"/></svg>
+    <span>Личный кабинет</span>
+    <span id="cabinetUnreadDot" class="tabbar-badge-dot d-none"></span>
+  </a>
+</nav>
+
+</body>
+</html>
