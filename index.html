@@ -508,6 +508,36 @@
       background: var(--color-surface-3); color: var(--color-text-secondary); }
     .hw-up.is-soon .hw-up-rel { background: var(--color-yellow-soft-bg); color: var(--color-yellow-soft-text); }
     .hw-up.is-over .hw-up-rel { background: var(--color-pink-soft-bg); color: var(--color-pink-soft-text); }
+    /* Кнопка возврата к текущей неделе */
+    .sch-today { display: block; margin: 8px auto 0; min-height: var(--control-h-sm); padding: 0 16px;
+      border: 1px solid var(--color-accent); border-radius: var(--radius-pill);
+      background: none; color: var(--color-accent); font-size: var(--fs-caption); font-weight: 600; }
+    /* Скелетон расписания */
+    .sch-skeleton { display: grid; gap: 8px; }
+    .sch-skeleton .skel-line { height: 74px; border-radius: var(--radius-lg); background: var(--color-surface); }
+    /* Отмеченное занятие */
+    .sch-lesson.is-done .sch-name { text-decoration: line-through; color: var(--color-text-tertiary); }
+    /* Нижний лист занятия */
+    .ls-when { margin-bottom: 14px; font-size: var(--fs-caption); color: var(--color-text-secondary); }
+    .ls-rows { display: grid; gap: 1px; margin-bottom: 16px; border-radius: var(--radius-lg); overflow: hidden;
+      background: var(--color-separator); }
+    .ls-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      padding: 11px 14px; background: var(--color-surface); font-size: var(--fs-caption); }
+    .ls-row span { color: var(--color-text-secondary); }
+    .ls-row b { min-width: 0; font-weight: 600; color: var(--color-text); text-align: right; }
+    .ls-hw-title { margin-bottom: 6px; font-size: var(--fs-small); font-weight: 600; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--color-text-tertiary); }
+    .ls-hw-text { padding: 11px 13px; margin-bottom: 16px; border-left: 3px solid var(--color-accent);
+      border-radius: var(--radius-sm); background: var(--color-surface-3);
+      font-size: var(--fs-caption); color: var(--color-text); }
+    .ls-done { display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--control-h-lg);
+      padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      background: var(--color-surface); color: var(--color-text); font-size: var(--fs-button); font-weight: 600; }
+    .ls-done .ls-check { flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+      border: 2px solid var(--color-border-strong); border-radius: 50%; color: transparent; }
+    .ls-done .ls-check svg { width: 15px; height: 15px; }
+    .ls-done.on { border-color: var(--color-green); background: var(--color-green-soft-bg); }
+    .ls-done.on .ls-check { border-color: var(--color-success-text); background: var(--color-success-text); color: #fff; }
     .hw-admin-item { padding: 10px 12px; margin-bottom: 8px; border-radius: var(--radius-md);
       background: var(--color-surface-3); }
     .hw-admin-item .t { font-size: var(--fs-caption); font-weight: 600; color: var(--color-text); }
@@ -737,7 +767,8 @@
       <button type="button" class="btn btn-outline-light btn-sm admin-only d-none" onclick="openHomeworkModal()">Управлять</button>
     </div>
 
-    <div class="sch-week">
+    <!-- no-swipe: по этой карточке свайп листает недели, а не разделы -->
+    <div class="sch-week no-swipe" id="hwWeekCard">
       <button type="button" class="cal-nav" id="hwPrevWeek" onclick="shiftScheduleWeek(-1)" aria-label="Предыдущая неделя">‹</button>
       <div class="sch-week-mid">
         <b id="hwWeekTitle">—</b>
@@ -745,9 +776,15 @@
       </div>
       <button type="button" class="cal-nav" id="hwNextWeek" onclick="shiftScheduleWeek(1)" aria-label="Следующая неделя">›</button>
     </div>
+    <button type="button" class="sch-today d-none" id="hwTodayBtn" onclick="resetToToday()">Сегодня</button>
 
     <div class="sch-days" id="hwDayStrip"></div>
-    <div id="hwDayList"></div>
+    <!-- no-swipe: по списку свайп листает дни. Скелетон виден, пока не пришли данные -->
+    <div id="hwDayList" class="no-swipe">
+      <div class="sch-skeleton" aria-hidden="true">
+        <div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div>
+      </div>
+    </div>
 
     <div class="kicker mt-4">Ближайшая домашка</div>
     <div id="hwUpcoming"></div>
@@ -1113,6 +1150,32 @@
 </div>
 
 <!-- Модальное окно: Разместить объявление -->
+<!-- Нижний лист занятия: полная карточка пары, «Сделано» и переход к преподавателю.
+     Класс swipe-sheet подключает закрытие смахиванием — тот же механизм, что у фильтров. -->
+<div class="modal fade swipe-sheet" id="lessonSheet" tabindex="-1" aria-labelledby="lessonSheetTitle">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content filter-sheet">
+      <div class="sheet-drag">
+        <div class="filter-sheet-handle" aria-hidden="true"></div>
+        <div class="filter-sheet-header">
+          <div class="filter-sheet-title" id="lessonSheetTitle">Занятие</div>
+        </div>
+      </div>
+      <button type="button" class="visually-hidden-focusable sheet-close" data-bs-dismiss="modal">Закрыть</button>
+      <div class="filter-sheet-body">
+        <div class="ls-when" id="lessonSheetWhen"></div>
+        <div class="ls-rows" id="lessonSheetRows"></div>
+        <div id="lessonSheetHw"></div>
+        <button type="button" class="ls-done" id="lessonSheetDone" aria-pressed="false">
+          <span class="ls-check" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg></span>
+          <span class="ls-done-label">Сделано</span>
+        </button>
+        <button type="button" class="btn btn-outline-light w-100 mt-2" id="lessonSheetTeacher">Карточка преподавателя</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Модальное окно: Домашка (админ) -->
 <div class="modal fade" id="homeworkModal" tabindex="-1" aria-labelledby="homeworkModalTitle">
   <div class="modal-dialog modal-dialog-scrollable">
@@ -2182,6 +2245,13 @@
     row.dataset.date = iso;
     row.dataset.from = String(toMinutes(lesson.start));
     row.dataset.to = String(toMinutes(lesson.end));
+    if (isLessonDone(lesson, iso)) row.classList.add('is-done');
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    row.addEventListener('click', () => openLessonSheet(lesson, iso));
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLessonSheet(lesson, iso); }
+    });
     return row;
   }
 
@@ -2285,6 +2355,9 @@
   }
 
   function renderHomeworkView() {
+    // Данные ещё не пришли — оставляем скелетон, а не пустой экран
+    if (!appData || !Array.isArray(appData.students)) return;
+
     const monday = dateOfLesson(scheduleWeek, 1);
     const saturday = dateOfLesson(scheduleWeek, 6);
     document.getElementById('hwWeekTitle').textContent = `Неделя ${scheduleWeek} из ${SEMESTER_WEEKS}`;
@@ -2292,6 +2365,8 @@
       `${monday.getDate()} ${MONTHS_GEN[monday.getMonth()]} – ${saturday.getDate()} ${MONTHS_GEN[saturday.getMonth()]}`;
     document.getElementById('hwPrevWeek').disabled = scheduleWeek <= 1;
     document.getElementById('hwNextWeek').disabled = scheduleWeek >= SEMESTER_WEEKS;
+    // Ушли с текущей недели — даём способ вернуться одним нажатием
+    document.getElementById('hwTodayBtn').classList.toggle('d-none', scheduleWeek === todayPosition(new Date()).week);
 
     // Полоска дней
     const todayKey = dayKey(new Date());
@@ -2359,6 +2434,145 @@
     document.getElementById('hwUpcomingEmpty').classList.toggle('d-none', upcoming.length > 0);
 
     startScheduleTicker();
+
+    // Жесты подключаем один раз: по списку — дни, по карточке недели — недели
+    if (!renderHomeworkView.swipesReady) {
+      renderHomeworkView.swipesReady = true;
+      enableHorizontalSwipe(document.getElementById('hwDayList'),
+        () => setScheduleDay(Math.min(6, scheduleDay + 1)),
+        () => setScheduleDay(Math.max(1, scheduleDay - 1)));
+      enableHorizontalSwipe(document.getElementById('hwWeekCard'),
+        () => shiftScheduleWeek(1),
+        () => shiftScheduleWeek(-1));
+      document.getElementById('lessonSheetDone').addEventListener('click', toggleLessonDone);
+    }
+  }
+
+  // ===== Нижний лист занятия =====
+  // «Сделано» хранится на устройстве и отдельно для каждого студента: ключ
+  // hw_done_<student_id>, внутри — отметки вида «дата|занятие». Это личная пометка,
+  // в data.json она не уходит и другим не видна.
+  let openLesson = null;
+
+  function doneStorageKey() {
+    const id = (myCabinetProfile && myCabinetProfile.student_id) || lsGet('my_student_id') || 'guest';
+    return 'hw_done_' + id;
+  }
+  function readDoneMap() {
+    try { return JSON.parse(lsGet(doneStorageKey()) || '{}'); } catch (e) { return {}; }
+  }
+  function lessonDoneKey(lesson, iso) { return iso + '|' + lesson.id; }
+  function isLessonDone(lesson, iso) { return !!readDoneMap()[lessonDoneKey(lesson, iso)]; }
+  function setLessonDone(lesson, iso, done) {
+    const map = readDoneMap();
+    const key = lessonDoneKey(lesson, iso);
+    if (done) map[key] = 1; else delete map[key];
+    lsSet(doneStorageKey(), JSON.stringify(map));
+  }
+
+  function lessonSheetRow(label, value) {
+    const row = document.createElement('div');
+    row.className = 'ls-row';
+    const l = document.createElement('span');
+    l.textContent = label;
+    const v = document.createElement('b');
+    v.textContent = value;
+    row.appendChild(l);
+    row.appendChild(v);
+    return row;
+  }
+
+  function renderLessonDoneButton() {
+    const btn = document.getElementById('lessonSheetDone');
+    if (!btn || !openLesson) return;
+    const done = isLessonDone(openLesson.lesson, openLesson.iso);
+    btn.classList.toggle('on', done);
+    btn.setAttribute('aria-pressed', done ? 'true' : 'false');
+    btn.querySelector('.ls-done-label').textContent = done ? 'Сделано' : 'Отметить сделанным';
+  }
+
+  function toggleLessonDone() {
+    if (!openLesson) return;
+    const next = !isLessonDone(openLesson.lesson, openLesson.iso);
+    setLessonDone(openLesson.lesson, openLesson.iso, next);
+    haptic(next ? 'success' : 'selection');
+    renderLessonDoneButton();
+    renderHomeworkView();
+  }
+
+  function openLessonSheet(lesson, iso) {
+    openLesson = { lesson, iso };
+    const date = deadlineDate(iso);
+    document.getElementById('lessonSheetTitle').textContent = lesson.subject;
+    document.getElementById('lessonSheetWhen').textContent =
+      `${DAY_NAMES[lesson.day]}, ${date.getDate()} ${MONTHS_GEN[date.getMonth()]} · ${lesson.start} – ${lesson.end}`;
+
+    const rows = document.getElementById('lessonSheetRows');
+    rows.innerHTML = '';
+    rows.appendChild(lessonSheetRow('Вид занятия', LESSON_KIND_FULL[lesson.type] || lesson.type));
+    rows.appendChild(lessonSheetRow('Аудитория', lesson.room || 'не указана'));
+    rows.appendChild(lessonSheetRow('Преподаватель', lesson.teacher || 'не указан'));
+    rows.appendChild(lessonSheetRow('Пара', lesson.pair + '-я'));
+    if (lesson.subgroup) rows.appendChild(lessonSheetRow('Подгруппа', lesson.subgroup + '-я'));
+
+    const hwBox = document.getElementById('lessonSheetHw');
+    hwBox.innerHTML = '';
+    const hw = homeworkForLesson(lesson, iso);
+    if (hw.length) {
+      const title = document.createElement('div');
+      title.className = 'ls-hw-title';
+      title.textContent = hw.length > 1 ? 'Домашние задания' : 'Домашнее задание';
+      hwBox.appendChild(title);
+      hw.forEach(h => {
+        const t = document.createElement('div');
+        t.className = 'ls-hw-text';
+        t.textContent = h.text || 'Без описания';
+        hwBox.appendChild(t);
+      });
+    }
+
+    const teacherBtn = document.getElementById('lessonSheetTeacher');
+    teacherBtn.classList.toggle('d-none', !lesson.teacher);
+    teacherBtn.onclick = () => {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('lessonSheet')).hide();
+      goToTeacherCard(lesson.subject);
+    };
+
+    renderLessonDoneButton();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('lessonSheet')).show();
+  }
+
+  // Переход к карточке преподавателя этого предмета: открываем раздел и раскрываем карточку
+  function goToTeacherCard(subject) {
+    goView('teachers');
+    setTimeout(() => {
+      const card = document.querySelector(`.teacher-card[data-subject="${(subject || '').replace(/"/g, '')}"]`);
+      if (!card) return;
+      if (!card.classList.contains('expanded')) toggleTeacherCard(card);
+      card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 60);
+  }
+
+  // Горизонтальный свайп по элементу. Порог по углу — чтобы жест не мешал
+  // вертикальной прокрутке: уводим палец вбок заметно сильнее, чем вниз.
+  function enableHorizontalSwipe(el, onLeft, onRight) {
+    let start = null;
+    el.addEventListener('touchstart', (e) => {
+      start = null;
+      if (e.touches.length !== 1 || document.querySelector('.modal.show')) return;
+      const t = e.touches[0];
+      if (t.clientX < 24 || t.clientX > window.innerWidth - 24) return;   // край экрана — системный «назад»
+      start = { x: t.clientX, y: t.clientY, time: Date.now() };
+    }, { passive: true });
+    el.addEventListener('touchend', (e) => {
+      if (!start) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - start.x, dy = t.clientY - start.y, dt = Date.now() - start.time;
+      start = null;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5 || dt > 700) return;
+      if (window.getSelection && String(window.getSelection())) return;
+      (dx < 0 ? onLeft : onRight)();
+    }, { passive: true });
   }
 
   // ===== Домашка: управление (администратор) =====
@@ -2564,7 +2778,7 @@
       const accent = TEACHER_ACCENT_COLORS[i % TEACHER_ACCENT_COLORS.length];
       const iconPath = SUBJECT_ICONS[t.subject] || DEFAULT_SUBJECT_ICON;
       return `
-      <div class="teacher-card mb-2" style="border-left-color: ${accent};" onclick="toggleTeacherCard(this)">
+      <div class="teacher-card mb-2" data-subject="${t.subject}" style="border-left-color: ${accent};" onclick="toggleTeacherCard(this)">
         <div class="teacher-card-header">
           <span class="badge ${badgeClass} bg-opacity-75 fw-normal">${examType}</span>
           <button type="button" class="teacher-card-edit-btn admin-only d-none" onclick="event.stopPropagation(); openEditTeacherModal('${t.id}')" title="Изменить">
