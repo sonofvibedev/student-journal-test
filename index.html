@@ -446,12 +446,7 @@
     .sch-week-mid { text-align: center; line-height: 1.25; }
     .sch-week-mid b { display: block; font-size: var(--fs-body); color: var(--color-text); }
     .sch-week-mid span { font-size: var(--fs-small); color: var(--color-text-tertiary); }
-    .sch-subgroup { display: flex; gap: 6px; margin: 12px 0 10px; }
-    .sch-sub-chip { min-height: var(--control-h-sm); padding: 0 12px; border: 1px solid var(--color-border);
-      border-radius: var(--radius-pill); background: var(--color-surface); color: var(--color-text-secondary);
-      font-size: var(--fs-caption); font-weight: 500; }
-    .sch-sub-chip.active { border-color: var(--color-active); background: var(--color-active); color: #fff; font-weight: 600; }
-    .sch-days { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 14px; }
+    .sch-days { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 12px 0 14px; }
     .sch-day { display: grid; justify-items: center; gap: 2px; padding: 8px 0 7px; border: 1px solid transparent;
       border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary);
       font-size: var(--fs-small); font-weight: 600; }
@@ -468,7 +463,8 @@
     .sch-time b { display: block; font-size: var(--fs-caption); font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; }
     .sch-time span { font-size: var(--fs-small); color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
     .sch-body { min-width: 0; flex: 1; }
-    .sch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .sch-head { display: flex; align-items: flex-start; gap: 8px; }
+    .sch-head .sch-name { flex: 1; min-width: 0; }
     .sch-name { font-size: var(--fs-caption); font-weight: 600; color: var(--color-text); }
     .sch-kind { flex: none; padding: 2px 7px; border-radius: var(--radius-xs); font-size: 11px; font-weight: 700;
       background: var(--color-surface-3); color: var(--color-text-secondary); }
@@ -476,6 +472,9 @@
     .sch-kind.k-lr { background: var(--color-purple-soft-bg); color: var(--color-purple-soft-text); }
     .sch-kind.k-pz { background: var(--color-green-soft-bg); color: var(--color-success-text); }
     .sch-kind.k-zc { background: var(--color-pink-soft-bg); color: var(--color-pink-soft-text); }
+    /* Пометка «1 пгр.» — тише типа занятия: это уточнение, а не ярлык */
+    .sch-sub { flex: none; padding: 2px 6px; border-radius: var(--radius-xs); font-size: 11px; font-weight: 600;
+      background: var(--color-surface-3); color: var(--color-text-tertiary); }
     .sch-meta { margin-top: 3px; font-size: var(--fs-small); color: var(--color-text-tertiary); }
     .sch-empty { padding: 20px 12px; border-radius: var(--radius-lg); background: var(--color-surface);
       color: var(--color-text-tertiary); font-size: var(--fs-caption); text-align: center; }
@@ -734,7 +733,6 @@
       <button type="button" class="cal-nav" id="hwNextWeek" onclick="shiftScheduleWeek(1)" aria-label="Следующая неделя">›</button>
     </div>
 
-    <div class="sch-subgroup" id="hwSubgroupRow" role="group" aria-label="Подгруппа"></div>
     <div class="sch-days" id="hwDayStrip"></div>
     <div id="hwDayList"></div>
 
@@ -2035,7 +2033,6 @@
 
   let scheduleWeek = currentSemesterWeek(new Date());
   let scheduleDay = (() => { const d = new Date().getDay(); return d >= 1 && d <= 6 ? d : 1; })();
-  let scheduleSubgroup = Number(lsGet('subgroup') || 0);
 
   const homeworkList = () => appData.homework || [];
 
@@ -2049,13 +2046,6 @@
 
   function setScheduleDay(day) {
     scheduleDay = day;
-    haptic('selection');
-    renderHomeworkView();
-  }
-
-  function setScheduleSubgroup(value) {
-    scheduleSubgroup = Number(value) || 0;
-    lsSet('subgroup', String(scheduleSubgroup));
     haptic('selection');
     renderHomeworkView();
   }
@@ -2112,9 +2102,17 @@
     kind.textContent = lesson.type;
     kind.title = LESSON_KIND_FULL[lesson.type] || lesson.type;
     head.appendChild(kind);
+    // Занятие только у одной подгруппы — неброская пометка рядом с типом
+    if (lesson.subgroup) {
+      const sg = document.createElement('span');
+      sg.className = 'sch-sub';
+      sg.textContent = lesson.subgroup + ' пгр.';
+      sg.title = 'Только у ' + lesson.subgroup + ' подгруппы';
+      head.appendChild(sg);
+    }
     body.appendChild(head);
 
-    const meta = [lesson.room && 'ауд. ' + lesson.room, lesson.teacher, lesson.subgroup && 'подгр. ' + lesson.subgroup]
+    const meta = [lesson.room && 'ауд. ' + lesson.room, lesson.teacher]
       .filter(Boolean).join(' · ');
     if (meta) {
       const m = document.createElement('div');
@@ -2169,22 +2167,9 @@
     document.getElementById('hwPrevWeek').disabled = scheduleWeek <= 1;
     document.getElementById('hwNextWeek').disabled = scheduleWeek >= SEMESTER_WEEKS;
 
-    // Подгруппа
-    const subRow = document.getElementById('hwSubgroupRow');
-    subRow.innerHTML = '';
-    [[0, 'Вся группа'], [1, '1 подгруппа'], [2, '2 подгруппа']].forEach(([value, label]) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'sch-sub-chip' + (scheduleSubgroup === value ? ' active' : '');
-      b.textContent = label;
-      b.setAttribute('aria-pressed', scheduleSubgroup === value ? 'true' : 'false');
-      b.addEventListener('click', () => setScheduleSubgroup(value));
-      subRow.appendChild(b);
-    });
-
     // Полоска дней
     const todayKey = dayKey(new Date());
-    const counts = daysWithLessons(scheduleWeek, scheduleSubgroup);
+    const counts = daysWithLessons(scheduleWeek);
     const strip = document.getElementById('hwDayStrip');
     strip.innerHTML = '';
     for (let d = 1; d <= 6; d++) {
@@ -2212,7 +2197,7 @@
     const iso = dayKey(date);
     const list = document.getElementById('hwDayList');
     list.innerHTML = '';
-    const lessons = lessonsOfDay(scheduleWeek, scheduleDay, scheduleSubgroup);
+    const lessons = lessonsOfDay(scheduleWeek, scheduleDay);
     if (!lessons.length) {
       const empty = document.createElement('div');
       empty.className = 'sch-empty';
