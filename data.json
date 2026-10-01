@@ -3,14 +3,14 @@
     {
       "id": "dl-1790529049699",
       "subject": "Маркетинг услуг",
-      "text": "Презентация по моделям Диме в личку",
+      "text": "Презентация по моделям — сдать старосте",
       "dueDate": "2026-09-30",
       "createdAt": "2026-09-27T17:10:49.699Z"
     },
     {
       "id": "dl-1790529102634",
       "subject": "Маркетинг услуг",
-      "text": "УСРС №1 по лекциям: https://elearning.bseu.by/mod/assign/view.php?id=134968",
+      "text": "УСРС №1 по лекциям: https://example.edu/assign/1",
       "dueDate": "2026-10-10",
       "createdAt": "2026-09-27T17:11:42.634Z"
     },
@@ -18,7 +18,7 @@
       "id": "dl-1790581913683",
       "type": "deadline",
       "subject": "Стратегический маркетинг",
-      "text": "Конкурс: отправить Сверлову на почту alekseisv@mail.ru",
+      "text": "Конкурс: отправить работу на teacher@example.edu",
       "dueDate": "2026-09-30",
       "createdAt": "2026-09-28T07:51:53.683Z"
     }
@@ -38,202 +38,202 @@
   "students": [
     {
       "id": "st-1758300000001",
-      "lastName": "Малибошко",
-      "firstName": "Александра",
+      "lastName": "Авдеева",
+      "firstName": "Ксения",
       "status": "Платное",
-      "telegramUsername": "alks_ndra"
+      "telegramUsername": "test_user01"
     },
     {
       "id": "st-1758300000002",
-      "lastName": "Малиновская",
-      "firstName": "Мая",
+      "lastName": "Багрицкий",
+      "firstName": "Тимур",
       "status": "Платное",
-      "telegramUsername": "mme0w3"
+      "telegramUsername": "test_user02"
     },
     {
       "id": "st-1758300000003",
-      "lastName": "Манкевич",
-      "firstName": "Мария",
+      "lastName": "Вербицкая",
+      "firstName": "Милана",
       "status": "Бюджет",
-      "telegramUsername": "bansheeea"
+      "telegramUsername": "test_user03"
     },
     {
       "id": "st-1758300000005",
-      "lastName": "Мозоль",
-      "firstName": "Екатерина",
+      "lastName": "Гайдук",
+      "firstName": "Святослав",
       "status": "Платное",
-      "telegramUsername": "morfkat"
+      "telegramUsername": "test_user04"
     },
     {
       "id": "st-1758300000006",
-      "lastName": "Мороз",
-      "firstName": "Анна",
+      "lastName": "Дорошевич",
+      "firstName": "Алеся",
       "status": "Бюджет",
       "role": "Зам. старосты",
-      "telegramUsername": "mridetttty"
+      "telegramUsername": "test_user05"
     },
     {
       "id": "st-1758300000007",
-      "lastName": "Мулярёнок",
-      "firstName": "Юлия",
+      "lastName": "Ерошенко",
+      "firstName": "Матвей",
       "status": "Бюджет",
-      "telegramUsername": "yuwimm"
+      "telegramUsername": "test_user06"
     },
     {
       "id": "st-1758300000008",
-      "lastName": "Огнянникова",
-      "firstName": "Ксения",
+      "lastName": "Жилинская",
+      "firstName": "Таисия",
       "status": "Платное",
-      "telegramUsername": "ksenia_ogn"
+      "telegramUsername": "test_user07"
     },
     {
       "id": "st-1758300000009",
-      "lastName": "Петрович",
-      "firstName": "Арсений",
+      "lastName": "Зубрицкий",
+      "firstName": "Марк",
       "status": "Бюджет",
-      "telegramUsername": "naaizz"
+      "telegramUsername": "test_user08"
     },
     {
       "id": "st-1758300000010",
-      "lastName": "Петрович",
-      "firstName": "Захар",
+      "lastName": "Иваницкая",
+      "firstName": "Олеся",
       "status": "Платное",
-      "telegramUsername": "notthistimeperhaps"
+      "telegramUsername": "test_user09"
     },
     {
       "id": "st-1758300000011",
-      "lastName": "Позднякова",
-      "firstName": "Валерия",
+      "lastName": "Кадошников",
+      "firstName": "Глеб",
       "status": "Платное",
-      "telegramUsername": "la1kask"
+      "telegramUsername": "test_user10"
     },
     {
       "id": "st-1758300000012",
-      "lastName": "Поленышев",
-      "firstName": "Дмитрий",
+      "lastName": "Лагутин",
+      "firstName": "Ростислав",
       "status": "Бюджет",
       "role": "Староста",
       "isAdmin": true,
-      "telegramUsername": "d1ma4wwq"
+      "telegramUsername": "test_user11"
     },
     {
       "id": "st-1758300000013",
-      "lastName": "Ракитская",
-      "firstName": "Анастасия",
+      "lastName": "Марцинкевич",
+      "firstName": "Диана",
       "status": "Бюджет",
-      "telegramUsername": "Blondyy0"
+      "telegramUsername": "test_user12"
     },
     {
       "id": "st-1758300000014",
-      "lastName": "Раковская",
-      "firstName": "Арина",
+      "lastName": "Невмержицкая",
+      "firstName": "Камилла",
       "status": "Бюджет",
-      "telegramUsername": "arinnnxq"
+      "telegramUsername": "test_user13"
     },
     {
       "id": "st-1758300000015",
-      "lastName": "Редько",
-      "firstName": "Владислав",
+      "lastName": "Островский",
+      "firstName": "Лев",
       "status": "Бюджет",
-      "telegramUsername": "vlad_redko"
+      "telegramUsername": "test_user14"
     },
     {
       "id": "st-1758300000016",
-      "lastName": "Семечко",
-      "firstName": "Злата",
+      "lastName": "Пашкевич",
+      "firstName": "Эмилия",
       "status": "Бюджет",
-      "telegramUsername": "zllaatiks"
+      "telegramUsername": "test_user15"
     },
     {
       "id": "st-1758300000017",
-      "lastName": "Сорокин",
-      "firstName": "Никита",
+      "lastName": "Радкевич",
+      "firstName": "Богдан",
       "status": "Платное",
       "isAdmin": true,
-      "telegramUsername": "sindeinf"
+      "telegramUsername": "test_user16"
     },
     {
       "id": "st-1758300000019",
-      "lastName": "Тарасюк",
-      "firstName": "Альбина",
+      "lastName": "Савостьянова",
+      "firstName": "Ярослава",
       "status": "Бюджет",
-      "telegramUsername": "WeiZhanla"
+      "telegramUsername": "test_user17"
     },
     {
       "id": "st-1758300000020",
-      "lastName": "Финютина",
-      "firstName": "Владислава",
+      "lastName": "Тишковец",
+      "firstName": "Демьян",
       "status": "Бюджет",
-      "telegramUsername": "Slfin10"
+      "telegramUsername": "test_user18"
     },
     {
       "id": "st-1758300000021",
-      "lastName": "Чалей",
-      "firstName": "Вадим",
+      "lastName": "Ульянович",
+      "firstName": "Злата",
       "status": "Платное",
-      "telegramUsername": "want3dd"
+      "telegramUsername": "test_user19"
     },
     {
       "id": "st-1758300000022",
-      "lastName": "Шемчак",
-      "firstName": "Анна",
+      "lastName": "Федорчук",
+      "firstName": "Герман",
       "status": "Платное",
-      "telegramUsername": "ann_shemm3"
+      "telegramUsername": "test_user20"
     },
     {
       "id": "st-1758300000023",
-      "lastName": "Шпакова",
-      "firstName": "Ева",
+      "lastName": "Харитонович",
+      "firstName": "Варвара",
       "status": "Платное",
-      "telegramUsername": "shpakkova"
+      "telegramUsername": "test_user21"
     },
     {
       "id": "st-1758300000024",
-      "lastName": "Щигло",
-      "firstName": "Илья",
+      "lastName": "Цыбульский",
+      "firstName": "Елисей",
       "status": "Платное"
     },
     {
       "id": "st-1758300000025",
-      "lastName": "Янголь",
-      "firstName": "Иван",
+      "lastName": "Чеховская",
+      "firstName": "Виктория",
       "status": "Бюджет",
-      "telegramUsername": "asdfghjklkjhgetu"
+      "telegramUsername": "test_user23"
     },
     {
       "id": "st-1789848049502",
-      "lastName": "Ключник",
-      "firstName": "Виктория",
+      "lastName": "Шульга",
+      "firstName": "Артемий",
       "status": "Платное",
-      "telegramUsername": "Kliuchnik937"
+      "telegramUsername": "test_user24"
     },
     {
       "id": "st-1789848068933",
-      "lastName": "Михальченко",
-      "firstName": "Кирилл",
+      "lastName": "Щербич",
+      "firstName": "Полина",
       "status": "Бюджет",
-      "telegramUsername": "mkmiche"
+      "telegramUsername": "test_user25"
     },
     {
       "id": "st-1789848096573",
-      "lastName": "Хотяшова",
-      "firstName": "Софья",
+      "lastName": "Эйсмонт",
+      "firstName": "Игнат",
       "status": "Платное",
-      "telegramUsername": "ewwpf"
+      "telegramUsername": "test_user26"
     },
     {
       "id": "st-1789850159847",
-      "lastName": "Медведева",
-      "firstName": "Александра",
+      "lastName": "Юркевич",
+      "firstName": "Аделина",
       "status": "Платное",
-      "telegramUsername": "aleksa0ndraa"
+      "telegramUsername": "test_user27"
     },
     {
       "id": "st-1789913607045",
-      "lastName": "Стахейко",
-      "firstName": "Егор",
+      "lastName": "Ярмолович",
+      "firstName": "Даниил",
       "status": "Платное",
-      "telegramUsername": "sk1rls"
+      "telegramUsername": "test_user28"
     }
   ],
   "absences": [
@@ -1211,60 +1211,60 @@
     {
       "id": "t-1",
       "subject": "Стратегический маркетинг",
-      "lecture": "Сверлов Алексей Сергеевич",
-      "practice": "Волонтей Алексей Викторович",
-      "lab": "Волонтей Алексей Викторович (подгр. 1 и 2)"
+      "lecture": "Громыко А.П.",
+      "practice": "Савицкая И.Н.",
+      "lab": "Белевич О.М. (подгр. 1 и 2)"
     },
     {
       "id": "t-2",
       "subject": "Эконометрика",
-      "lecture": "Миксюк Светлана Федоровна",
-      "practice": "Стасева А.А.",
-      "lab": "Пушкин С.А. (подгр. 1), Стасева А.А. (подгр. 2)"
+      "lecture": "Дубровский К.Я.",
+      "practice": "Ковалевич Н.Т.",
+      "lab": "Милашевич Е.В. (подгр. 2)"
     },
     {
       "id": "t-3",
       "subject": "Интегрированные маркетинговые коммуникации",
-      "lecture": "Бутеня Владимир Евгеньевич",
-      "practice": "Левчук Карина Александровна",
-      "lab": "Левчук Карина Александровна (подгр. 1 и 2)"
+      "lecture": "Остапчук Р.Д.",
+      "practice": "Пивоваров С.Л.",
+      "lab": "Рудковская Т.А. (подгр. 1 и 2)"
     },
     {
       "id": "t-4",
       "subject": "Маркетинг инноваций",
-      "lecture": "Протасеня Василий Сергеевич",
-      "practice": "Анкинович Юлия Евгеньевна",
-      "lab": "Анкинович Юлия Евгеньевна (подгр. 1 и 2)"
+      "lecture": "Семашко В.И.",
+      "practice": "Тарарышкин Д.Б.",
+      "lab": "Федута А.Г. (подгр. 1 и 2)"
     },
     {
       "id": "t-5",
       "subject": "Функционально-стоимостный анализ",
-      "lecture": "Синявская Ольга Александровна",
-      "practice": "Трушкевич Наталья Леонидовна",
+      "lecture": "Хмельницкая Л.С.",
+      "practice": "Чигирь М.В.",
       "lab": ""
     },
     {
       "id": "t-6",
       "subject": "Маркетинговые исследования и аналитика",
-      "lecture": "Ковалева Ольга Леонидовна",
-      "practice": "Артёменко Светлана Вячеславовна",
-      "lab": "Артёменко Светлана Вячеславовна (подгр. 1 и 2)"
+      "lecture": "Шандрикова Е.П.",
+      "practice": "Громыко А.П.",
+      "lab": "Савицкая И.Н. (подгр. 1 и 2)"
     },
     {
       "id": "t-7",
       "subject": "Маркетинг услуг",
-      "lecture": "Демченко Елена Владимировна",
-      "practice": "Шумских Ирина Станиславовна",
+      "lecture": "Белевич О.М.",
+      "practice": "Дубровский К.Я.",
       "lab": ""
     },
     {
       "id": "t-8",
       "subject": "Логистика",
-      "lecture": "Верниковская Оксана Васильевна",
-      "practice": "Яровская Екатерина Сергеевна",
+      "lecture": "Ковалевич Н.Т.",
+      "practice": "Милашевич Е.В.",
       "lab": ""
     }
   ],
   "announcements": [],
-  "lastUpdated": "2026-09-28T08:45:19.248Z"
+  "lastUpdated": "2026-10-01T18:04:13.069Z"
 }

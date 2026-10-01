@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Личный кабинет — Журнал 24ДММ-2</title>
 
+  <!-- Окружение (тест/рабочая версия): ключи localStorage, репозиторий, Supabase. Первым в <head> -->
+  <script src="env.js?v=12"></script>
+
   <!-- PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#060606">
@@ -18,7 +21,7 @@
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Общая дизайн-система (токены, шрифты, компоненты, анимации) -->
-  <link href="app.css?v=11" rel="stylesheet"><!-- ?v= — та же цифра, что CACHE_VERSION в sw.js: новая страница не возьмёт старый файл из кэша -->
+  <link href="app.css?v=12" rel="stylesheet"><!-- ?v= — та же цифра, что CACHE_VERSION в sw.js: новая страница не возьмёт старый файл из кэша -->
   <style>
     /* ===== Личный кабинет: стили страницы (токены и общие компоненты — в app.css).
        Шапка и статистика — вариант «Как в Telegram», хронология и объявления — «Лента», зачётка — «Списки» ===== */
@@ -667,9 +670,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
-<script src="shared.js?v=11"></script>
+<script src="shared.js?v=12"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="studak.js?v=11"></script>
+<script src="studak.js?v=12"></script>
 <script>
   // FX — лёгкие анимации на CSS (классы .fx-reveal и .fx-pop в app.css): JS только расставляет классы
   // и задержки, анимируются лишь transform и opacity. При «Уменьшении движения» FX выключен
@@ -902,7 +905,7 @@
   ];
 
   function checkWhatsNew() {
-    const seenVersion = Number(localStorage.getItem('whats_new_seen') || 0);
+    const seenVersion = Number(lsGet('whats_new_seen') || 0);
     if (seenVersion >= WHATS_NEW_VERSION) return;
 
     document.getElementById('whatsNewDate').innerText = `Обновлено: ${WHATS_NEW_DATE}`;
@@ -910,7 +913,7 @@
     const modalEl = document.getElementById('whatsNewModal');
     const modal = new bootstrap.Modal(modalEl);
     modalEl.addEventListener('hidden.bs.modal', () => {
-      localStorage.setItem('whats_new_seen', String(WHATS_NEW_VERSION));
+      lsSet('whats_new_seen', String(WHATS_NEW_VERSION));
     }, { once: true });
     modal.show();
   }
@@ -951,15 +954,14 @@
   // В коде только адрес проекта и публичный ключ (sb_publishable): что можно читать и менять,
   // решают правила RLS в базе. Логин превращается в технический email <логин>@students.journal-24dmm2.app.
   // Аккаунты создаёт Edge Function register-with-code по одноразовому коду от старосты.
-  const SUPABASE_URL = 'https://woiqekpuoddxixlrbvkp.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_I1jhpJqVFBcd_ceZ-hYmGg_-MdIiZ1k';
+  // SUPABASE_URL и SUPABASE_KEY — в env.js
   const LOGIN_EMAIL_DOMAIN = 'students.journal-24dmm2.app';
   const LOGIN_RE = /^[a-z0-9_.]{3,32}$/;
   const PASSWORD_MIN = 8;
   const PROFILE_CACHE_KEY = 'journal_profile';   // { user_id, student_id, login } — чтобы кабинет открывался без сети
   // Сессия хранится supabase-js в localStorage — переживает перезапуск в браузере, PWA и Telegram
   const sb = window.supabase
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } })
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: SB_STORAGE_KEY, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } })
     : null;
   let myProfile = null;
   let inviteState = null;   // { code, student_id, has_account, login } — между шагами «Первого входа»
@@ -1020,12 +1022,12 @@
   }
 
   function readCachedProfile() {
-    try { return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || 'null'); } catch (e) { return null; }
+    try { return JSON.parse(lsGet(PROFILE_CACHE_KEY) || 'null'); } catch (e) { return null; }
   }
   function writeCachedProfile(profile) {
     try {
-      if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
-      else localStorage.removeItem(PROFILE_CACHE_KEY);
+      if (profile) lsSet(PROFILE_CACHE_KEY, JSON.stringify(profile));
+      else lsRemove(PROFILE_CACHE_KEY);
     } catch (e) {}
   }
 
@@ -1046,7 +1048,7 @@
   }
 
   async function openPersonalCabinet() {
-    localStorage.removeItem('my_student_id');   // старый вход user## больше не используется
+    lsRemove('my_student_id');   // старый вход user## больше не используется
     const cached = readCachedProfile();
     if (!sb) {
       // supabase-js не загрузился (нет сети): показываем кабинет по сохранённому профилю
@@ -1281,13 +1283,13 @@
       }
     }
     // Без сети supabase-js мог не загрузиться — стираем сохранённую сессию сами
-    try { localStorage.removeItem(`sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`); } catch (e) {}
+    try { localStorage.removeItem(SB_STORAGE_KEY); } catch (e) {}   // SB_STORAGE_KEY уже с приставкой — без обёртки
   }
 
   async function logoutCabinet() {
     await signOutQuietly();
     // Выход из кабинета — выход и из админ-режима: токен не остаётся на общем устройстве
-    try { localStorage.removeItem('gh_pat'); } catch (e) {}
+    try { lsRemove('gh_pat'); } catch (e) {}
     if (typeof closeStudak === 'function') closeStudak(true);
     writeCachedProfile(null);
     writeCachedAvatar(null);
@@ -1301,7 +1303,7 @@
   // Строка «Админ-панель» видна только студентам с isAdmin: true (или если токен уже сохранён на устройстве,
   // чтобы можно было выйти). Токен не проверяется — просто сохраняется в localStorage gh_pat, как раньше.
   function readAdminToken() {
-    try { return localStorage.getItem('gh_pat') || ''; } catch (e) { return ''; }
+    try { return lsGet('gh_pat') || ''; } catch (e) { return ''; }
   }
   function updateAdminUI() {
     const student = appData.students.find(s => s.id === myStudentId);
@@ -1328,14 +1330,14 @@
     const input = document.getElementById('githubTokenInput');
     const token = input.value.trim();
     if (!token) { haptic('error'); return showAlert('Введите токен!'); }
-    try { localStorage.setItem('gh_pat', token); } catch (e) { return showAlert('Не удалось сохранить токен на этом устройстве'); }
+    try { lsSet('gh_pat', token); } catch (e) { return showAlert('Не удалось сохранить токен на этом устройстве'); }
     input.value = '';
     haptic('success');
     updateAdminUI();
     renderAdminModal('Вы вошли как администратор');
   }
   function logoutAdmin() {
-    try { localStorage.removeItem('gh_pat'); } catch (e) {}
+    try { lsRemove('gh_pat'); } catch (e) {}
     haptic('success');
     updateAdminUI();
     renderAdminModal();
@@ -1352,12 +1354,12 @@
   let myAvatarUrl = null;
 
   function readCachedAvatar() {
-    try { return JSON.parse(localStorage.getItem(AVATAR_CACHE_KEY) || 'null'); } catch (e) { return null; }
+    try { return JSON.parse(lsGet(AVATAR_CACHE_KEY) || 'null'); } catch (e) { return null; }
   }
   function writeCachedAvatar(value) {
     try {
-      if (value) localStorage.setItem(AVATAR_CACHE_KEY, JSON.stringify(value));
-      else localStorage.removeItem(AVATAR_CACHE_KEY);
+      if (value) lsSet(AVATAR_CACHE_KEY, JSON.stringify(value));
+      else lsRemove(AVATAR_CACHE_KEY);
     } catch (e) {}
   }
   const avatarPath = () => `${myProfile.user_id}.jpg`;
@@ -1513,7 +1515,7 @@
     renderDeadlines();
     renderMyAbsences();
     renderZachetka();
-    setGradesTab(localStorage.getItem('grades_tab'));
+    setGradesTab(lsGet('grades_tab'));
     FX.reveal('#cabinetContentSection > .student-summary-card');
     cabinetSection = null;
     setCabinetSection(cabinetSectionFromHash(), 'init');   // cabinet.html#deadlines — сразу «Дедлайны»
@@ -1750,7 +1752,7 @@
 
   function loadZachetkaState() {
     try {
-      return JSON.parse(localStorage.getItem('zachetka_grades') || '{}');
+      return JSON.parse(lsGet('zachetka_grades') || '{}');
     } catch (e) {
       return {};
     }
@@ -1784,7 +1786,7 @@
     if (!value) delete grades[subject];
     else if (value === 'зач') grades[subject] = 'зач';
     else grades[subject] = Number(value);
-    localStorage.setItem('zachetka_grades', JSON.stringify(grades));
+    lsSet('zachetka_grades', JSON.stringify(grades));
     updateZachetkaAverage(grades);
   }
 
@@ -1808,7 +1810,7 @@
 
   function updateAnnouncementsUnreadDot() {
     let seen = [];
-    try { seen = JSON.parse(localStorage.getItem('seen_announcements') || '[]'); } catch (e) {}
+    try { seen = JSON.parse(lsGet('seen_announcements') || '[]'); } catch (e) {}
     const hasUnread = currentPersonalAnnouncements.some(a => !seen.includes(a.id));
     document.getElementById('cabinetAnnouncementsDot').classList.toggle('d-none', !hasUnread);
   }
@@ -1907,11 +1909,11 @@
   function updateTodayGrades() {
     document.getElementById('todayZachetkaAvg').innerText = document.getElementById('zachetkaAverage').innerText;
     let st = null;
-    try { st = JSON.parse(localStorage.getItem('rating_calc_state') || 'null'); } catch (e) {}
+    try { st = JSON.parse(lsGet('rating_calc_state') || 'null'); } catch (e) {}
     const c = st && Array.isArray(st.control) ? st.control : [], o = st && Array.isArray(st.oral) ? st.oral : [];
-    const k = parseFloat(localStorage.getItem('rating_seminar_coef')) || 0.6;
-    const w = parseFloat(localStorage.getItem('rating_final_coef')) || 0.4;
-    const exam = parseFloat(localStorage.getItem('rating_exam_grade'));
+    const k = parseFloat(lsGet('rating_seminar_coef')) || 0.6;
+    const w = parseFloat(lsGet('rating_final_coef')) || 0.4;
+    const exam = parseFloat(lsGet('rating_exam_grade'));
     const sem = avgOf(c) * k + avgOf(o) * (1 - k);
     const el = document.getElementById('todayRating');
     if (!c.length && !o.length) el.innerText = '—';
@@ -1923,10 +1925,10 @@
   // index.html для красной точки на вкладке "Личный кабинет" в таб-баре)
   function markAnnouncementsSeen(list) {
     let seen = [];
-    try { seen = JSON.parse(localStorage.getItem('seen_announcements') || '[]'); } catch (e) {}
+    try { seen = JSON.parse(lsGet('seen_announcements') || '[]'); } catch (e) {}
     const ids = list.map(a => a.id);
     const merged = Array.from(new Set(seen.concat(ids)));
-    localStorage.setItem('seen_announcements', JSON.stringify(merged));
+    lsSet('seen_announcements', JSON.stringify(merged));
   }
 
   // Замена браузерных alert()/confirm() — те же модалки, что в index.html
@@ -1964,7 +1966,7 @@
 
   function loadRatingCalcState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('rating_calc_state') || 'null');
+      const saved = JSON.parse(lsGet('rating_calc_state') || 'null');
       if (saved && Array.isArray(saved.control) && Array.isArray(saved.oral)) {
         ratingCalc = saved;
       } else {
@@ -1976,7 +1978,7 @@
   }
 
   function saveRatingCalcState() {
-    localStorage.setItem('rating_calc_state', JSON.stringify(ratingCalc));
+    lsSet('rating_calc_state', JSON.stringify(ratingCalc));
   }
 
   function openRatingCalculator() {
@@ -1984,13 +1986,13 @@
     renderGradesList('control');
     renderGradesList('oral');
 
-    const savedSeminarCoef = localStorage.getItem('rating_seminar_coef');
+    const savedSeminarCoef = lsGet('rating_seminar_coef');
     if (savedSeminarCoef) document.getElementById('seminarCoefSelect').value = savedSeminarCoef;
 
-    const savedFinalCoef = localStorage.getItem('rating_final_coef');
+    const savedFinalCoef = lsGet('rating_final_coef');
     if (savedFinalCoef) document.getElementById('finalCoefSelect').value = savedFinalCoef;
 
-    const savedExam = localStorage.getItem('rating_exam_grade');
+    const savedExam = lsGet('rating_exam_grade');
     document.getElementById('examGradeInput').value = savedExam || '';
     document.getElementById('examNotYet').checked = !savedExam;
     if (savedExam) document.getElementById('examGradeRange').value = savedExam;
@@ -2060,7 +2062,7 @@
 
     const k1 = Math.round(parseFloat(document.getElementById('seminarCoefSelect').value) * 10) / 10;
     const k2 = 1 - k1;
-    localStorage.setItem('rating_seminar_coef', k1);
+    lsSet('rating_seminar_coef', k1);
     document.getElementById('seminarCoefLabel').innerText = coefPair(k1);
 
     const seminarRating = controlAvg * k1 + oralAvg * k2;
@@ -2068,7 +2070,7 @@
     document.getElementById('seminarRatingResult').innerText = hasSeminarGrades ? seminarRating.toFixed(2) : '—';
 
     const examGradeRaw = document.getElementById('examGradeInput').value;
-    localStorage.setItem('rating_exam_grade', examGradeRaw || '');
+    lsSet('rating_exam_grade', examGradeRaw || '');
     const examGrade = parseFloat(examGradeRaw);
     document.getElementById('examGradeLabel').innerText = isNaN(examGrade) ? '—' : examGrade.toFixed(1);
     document.getElementById('examGradeValue').innerText = isNaN(examGrade) ? '—' : String(examGrade);
@@ -2076,7 +2078,7 @@
 
     const w1 = Math.round(parseFloat(document.getElementById('finalCoefSelect').value) * 10) / 10;
     const w2 = 1 - w1;
-    localStorage.setItem('rating_final_coef', w1);
+    lsSet('rating_final_coef', w1);
     document.getElementById('finalCoefLabel').innerText = coefPair(w1);
 
     const finalResultEl = document.getElementById('finalRatingResult');
@@ -2096,8 +2098,8 @@
   async function clearRatingCalc() {
     if (!(await showConfirm('Очистить все введённые оценки калькулятора?'))) return;
     ratingCalc = { control: [], oral: [] };
-    localStorage.removeItem('rating_calc_state');
-    localStorage.removeItem('rating_exam_grade');
+    lsRemove('rating_calc_state');
+    lsRemove('rating_exam_grade');
     document.getElementById('examGradeInput').value = '';
     document.getElementById('examNotYet').checked = true;
     renderGradesList('control');
@@ -2114,7 +2116,7 @@
     document.getElementById('gradesPaneZachetka').classList.toggle('d-none', tab !== 'zachetka');
     document.getElementById('gradesPaneCalc').classList.toggle('d-none', tab !== 'calc');
     if (tab === 'calc') openRatingCalculator();
-    try { localStorage.setItem('grades_tab', tab); } catch (e) {}
+    try { lsSet('grades_tab', tab); } catch (e) {}
   }
 
   init();
@@ -2272,7 +2274,7 @@
     document.getElementById('statsViewFeed').classList.toggle('d-none', cal);
     document.getElementById('statsViewCalendar').classList.toggle('d-none', !cal);
     if (cal) renderCalendar();
-    try { localStorage.setItem('cabinet_stats_view', cal ? 'calendar' : 'feed'); } catch (e) {}
+    try { lsSet('cabinet_stats_view', cal ? 'calendar' : 'feed'); } catch (e) {}
   }
   function calendarAbsences() {
     const subject = document.getElementById('cabinetSubject').value;
@@ -2355,7 +2357,7 @@
   afterRender('showCabinetContent', () => {
     calendarMonth = null; calendarDay = null;
     let view = 'feed';
-    try { view = localStorage.getItem('cabinet_stats_view') || 'feed'; } catch (e) {}
+    try { view = lsGet('cabinet_stats_view') || 'feed'; } catch (e) {}
     setStatsView(view);
   });
   afterRender('showCabinetContent', () => {
@@ -2438,7 +2440,7 @@
     ring.setAttribute('stroke', pct === null ? '#2c2c2e' : pct >= 50 ? '#34c759' : pct >= 25 ? '#ffd60a' : '#ff628f');
     const msgs = currentPersonalAnnouncements || [];
     let seen = [];
-    try { seen = JSON.parse(localStorage.getItem('seen_announcements') || '[]'); } catch (e) {}
+    try { seen = JSON.parse(lsGet('seen_announcements') || '[]'); } catch (e) {}
     const personal = msgs.filter(a => a.targetType !== 'ALL').length;
     document.getElementById('dashMsgCount').textContent = msgs.length;
     document.getElementById('dashMsgSub').textContent = personal ? `${personal} лично вам` : 'от старосты и админа';
