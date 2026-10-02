@@ -88,7 +88,8 @@ foreach ($htmlName in @("index.html", "cabinet.html")) {
 # Добавляем файлы (каждый — только если реально есть в папке)
 $files = @(
     "index.html", "cabinet.html", "pass.html",
-    "app.css", "env.js", "theme.js", "changelog.js", "shared.js", "studak.js", "schedule.js", "notify.js",
+    "app.css", "profile.css",
+    "env.js", "theme.js", "changelog.js", "shared.js", "profile.js", "studak.js", "schedule.js", "notify.js",
     "data.json", "manifest.json", "sw.js", "robots.txt", "icons", "fonts"
 )
 foreach ($name in $files) {
