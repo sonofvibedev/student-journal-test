@@ -1,0 +1,589 @@
+﻿/* ============================================================================
+   UI-кит демо. Это и есть «общий модуль», про который шла речь: на шаге 3
+   выбранный вариант переносится в app.css почти без правок.
+
+   Строится поверх токенов app.css (--color-*, --radius-*, --space-*,
+   --font-sans, --dur-*, --ease-*, --tabbar-h, --app-inset-*).
+
+   Три слоя:
+     1. Исправление сломанных токенов app.css
+     2. Фигуры (--ui-*), которые переопределяет каждый из 4 стилей
+     3. Хром приложения: заголовок, таб-бар, боковая панель, листы, кнопка «+»
+   ========================================================================== */
+
+/* ===== 1. Починка: в app.css --g-l-border-mid / --g-l-border-strong
+   записаны как #c2c3NaN и подобные — это невалидный цвет, и в светлой теме
+   обе переменные молча ломаются во всех пяти палитрах. Здесь — рабочие
+   значения того же тона. ==================================================== */
+[data-gamma="blue"]    { --g-l-border-mid: #c2c5cf; --g-l-border-strong: #a8abb8; }
+[data-gamma="emerald"] { --g-l-border-mid: #bccbc5; --g-l-border-strong: #a3b0aa; }
+[data-gamma="indigo"]  { --g-l-border-mid: #c5c2d2; --g-l-border-strong: #aba8ba; }
+[data-gamma="amber"]   { --g-l-border-mid: #cbc4b8; --g-l-border-strong: #b0aa9e; }
+[data-gamma="wine"]    { --g-l-border-mid: #d6c0c4; --g-l-border-strong: #baa6aa; }
+
+/* ===== 2. Фигуры. Значения по умолчанию = стиль A ===== */
+:root {
+  --ui-page-pad:      var(--space-4);
+  --ui-gap:           var(--space-3);
+
+  --ui-card-bg:       var(--color-surface);
+  --ui-card-radius:   var(--radius-lg);
+  --ui-card-border:   1px solid transparent;
+  --ui-card-shadow:   none;
+  --ui-card-pad:      var(--space-4);
+  --ui-card-blur:     none;
+
+  --ui-row-pad:       12px var(--space-4);
+  --ui-row-line:      1px solid var(--color-separator);
+
+  --ui-title-size:    var(--fs-title);
+  --ui-title-weight:  700;
+  --ui-title-track:   -0.8px;
+
+  --ui-num-size:      28px;
+  --ui-num-weight:    700;
+
+  --ui-tabbar-bg:     var(--color-surface);
+  --ui-tabbar-radius: var(--radius-pill);
+  --ui-tabbar-border: 1px solid var(--color-border);
+  --ui-tabbar-shadow: 0 8px 28px rgba(0, 0, 0, .28);
+  --ui-tabbar-blur:   none;
+  --ui-tab-pill:      var(--color-selection);
+
+  --ui-chip-bg:       var(--color-surface-3);
+  --ui-chip-radius:   var(--radius-pill);
+
+  --ui-accent-fill:   var(--color-accent);
+  --ui-accent-text:   #fff;
+}
+
+/* ---- Стиль A. «Как в Telegram/iOS»: крупные заголовки, сгруппированные
+   списки, минимум цвета. Карточка — это группа строк, а не плитка. ---- */
+[data-style="a"] {
+  --ui-card-pad:      0;
+  --ui-card-radius:   var(--radius-lg);
+  --ui-title-size:    34px;
+  --ui-gap:           var(--space-5);
+}
+
+/* ---- Стиль B. «Плитки-виджеты»: бенто разного размера, яркие акценты ---- */
+[data-style="b"] {
+  --ui-page-pad:      var(--space-3);
+  --ui-gap:           10px;
+  --ui-card-radius:   20px;
+  --ui-card-shadow:   0 6px 20px rgba(0, 0, 0, .18);
+  --ui-card-pad:      var(--space-4);
+  --ui-row-line:      none;
+  --ui-title-size:    26px;
+  --ui-num-size:      34px;
+  --ui-tabbar-radius: 22px;
+}
+
+/* ---- Стиль C. «Минимализм»: много воздуха, тонкие линии, крупные цифры,
+   один акцент. Поверхностей почти нет — фон и линии. ---- */
+[data-style="c"] {
+  --ui-page-pad:      var(--space-5);
+  --ui-gap:           var(--space-8);
+  --ui-card-bg:       transparent;
+  --ui-card-radius:   0;
+  --ui-card-pad:      0;
+  --ui-card-border:   none;
+  --ui-card-shadow:   none;
+  --ui-row-pad:       14px 0;
+  --ui-title-size:    30px;
+  --ui-title-weight:  600;
+  --ui-num-size:      44px;
+  --ui-num-weight:    600;
+  --ui-tabbar-bg:     transparent;
+  --ui-tabbar-border: none;
+  --ui-tabbar-shadow: none;
+  --ui-chip-bg:       transparent;
+}
+
+/* ---- Стиль D. «Стекло»: полупрозрачные поверхности с размытием ---- */
+[data-style="d"] {
+  --ui-card-bg:       rgba(var(--color-surface-rgb, 20, 20, 22), .55);
+  --ui-card-border:   1px solid rgba(255, 255, 255, .10);
+  --ui-card-blur:     saturate(180%) blur(20px);
+  --ui-card-radius:   18px;
+  --ui-card-shadow:   0 8px 32px rgba(0, 0, 0, .22);
+  --ui-tabbar-bg:     rgba(var(--color-surface-rgb, 20, 20, 22), .62);
+  --ui-tabbar-blur:   saturate(180%) blur(22px);
+  --ui-tabbar-border: 1px solid rgba(255, 255, 255, .12);
+}
+[data-bs-theme="light"][data-style="d"],
+[data-bs-theme="light"] [data-style="d"] {
+  --ui-card-border:   1px solid rgba(0, 0, 0, .07);
+  --ui-tabbar-border: 1px solid rgba(0, 0, 0, .08);
+}
+/* Размытие на слабом устройстве выключено — остаётся плотная заливка */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-style="d"] { --ui-card-bg: var(--color-surface); --ui-tabbar-bg: var(--color-surface); }
+}
+
+/* ===== 3. Хром ===== */
+
+/* --- Каркас --- */
+.ui-app {
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-text-2);
+  font-family: var(--font-sans);
+  letter-spacing: var(--tracking);
+}
+.ui-main {
+  padding: 0 var(--ui-page-pad) var(--tabbar-space);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* --- Заголовок: название слева, колокольчик справа сверху --- */
+.ui-head {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: calc(var(--app-inset-top) + 10px) var(--ui-page-pad) 10px;
+  background: linear-gradient(to bottom, var(--color-bg) 70%, rgba(var(--color-bg-rgb), 0));
+}
+.ui-head-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: var(--ui-title-track);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-head-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  position: relative;
+}
+.ui-head-btn svg { width: 22px; height: 22px; }
+
+/* Крупный заголовок страницы под шапкой */
+.ui-title {
+  font-size: var(--ui-title-size);
+  font-weight: var(--ui-title-weight);
+  line-height: 1.12;
+  letter-spacing: var(--ui-title-track);
+  color: var(--color-text);
+  margin: var(--space-2) 0 var(--space-4);
+}
+.ui-sub { color: var(--color-text-secondary); font-size: var(--fs-caption); margin: -10px 0 var(--space-4); }
+
+/* --- Карточка --- */
+.ui-card {
+  background: var(--ui-card-bg);
+  border: var(--ui-card-border);
+  border-radius: var(--ui-card-radius);
+  box-shadow: var(--ui-card-shadow);
+  padding: var(--ui-card-pad);
+  backdrop-filter: var(--ui-card-blur);
+  -webkit-backdrop-filter: var(--ui-card-blur);
+  overflow: hidden;
+}
+.ui-stack { display: flex; flex-direction: column; gap: var(--ui-gap); }
+.ui-card-head {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--ui-card-pad) var(--ui-card-pad) 0;
+  font-weight: 600; color: var(--color-text);
+}
+[data-style="c"] .ui-card-head { padding: 0; }
+.ui-card-head + .ui-rows { margin-top: var(--space-2); }
+
+/* Заголовок группы в стиле iOS — мелкий, над карточкой */
+.ui-group-label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: var(--color-text-tertiary);
+  padding: 0 var(--space-4) var(--space-2);
+}
+[data-style="c"] .ui-group-label { padding-left: 0; padding-right: 0; }
+
+/* --- Строка списка --- */
+.ui-rows { display: flex; flex-direction: column; }
+.ui-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--ui-row-pad);
+  min-height: 48px;
+  background: none;
+  border: 0;
+  border-top: var(--ui-row-line);
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+.ui-row:first-child { border-top: 0; }
+.ui-row-ico {
+  flex: 0 0 auto; width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: var(--color-surface-3);
+  color: var(--color-accent);
+}
+[data-style="c"] .ui-row-ico { background: none; }
+.ui-row-ico svg { width: 17px; height: 17px; }
+.ui-row-body { flex: 1 1 auto; min-width: 0; display: block; }
+.ui-row-title { display: block; color: var(--color-text); font-size: var(--fs-body); line-height: 1.3; }
+.ui-row-note { display: block; color: var(--color-text-secondary); font-size: var(--fs-small); line-height: 1.35; margin-top: 2px; }
+.ui-row-val { flex: 0 0 auto; color: var(--color-text-secondary); font-size: var(--fs-caption); white-space: nowrap; }
+.ui-row-chev { flex: 0 0 auto; color: var(--color-text-tertiary); }
+.ui-row-chev svg { width: 16px; height: 16px; display: block; }
+.ui-row[role="button"]:active, a.ui-row:active, button.ui-row:active { background: var(--color-selection); }
+
+/* --- Плитки (стиль B и экран «Учёба») --- */
+.ui-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-gap); }
+.ui-tile {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--space-4);
+  min-height: 104px;
+  background: var(--ui-card-bg);
+  border: var(--ui-card-border);
+  border-radius: var(--ui-card-radius);
+  box-shadow: var(--ui-card-shadow);
+  backdrop-filter: var(--ui-card-blur);
+  -webkit-backdrop-filter: var(--ui-card-blur);
+  color: inherit; text-decoration: none; text-align: left;
+  font: inherit; letter-spacing: inherit;
+  position: relative;
+}
+[data-style="c"] .ui-tile { border: 1px solid var(--color-separator); background: none; }
+.ui-tile-wide { grid-column: 1 / -1; }
+.ui-tile-ico { width: 30px; height: 30px; color: var(--color-accent); }
+.ui-tile-ico svg { width: 100%; height: 100%; }
+.ui-tile-name { color: var(--color-text); font-weight: 600; font-size: var(--fs-body); }
+.ui-tile-note { color: var(--color-text-secondary); font-size: var(--fs-small); }
+
+/* --- Крупное число --- */
+.ui-num { font-size: var(--ui-num-size); font-weight: var(--ui-num-weight); color: var(--color-text); line-height: 1; letter-spacing: -1px; }
+.ui-num-cap { color: var(--color-text-secondary); font-size: var(--fs-small); margin-top: 4px; }
+
+/* --- Чипы и сегменты --- */
+.ui-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.ui-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--ui-chip-radius);
+  background: var(--ui-chip-bg);
+  border: 1px solid transparent;
+  color: var(--color-text-2);
+  font-size: var(--fs-chip);
+  font: inherit; font-size: var(--fs-chip);
+}
+[data-style="c"] .ui-chip { border-color: var(--color-border); }
+.ui-chip.is-on { background: var(--ui-accent-fill); color: var(--ui-accent-text); border-color: transparent; }
+
+.ui-seg {
+  display: flex; gap: 2px; padding: 3px;
+  background: var(--color-surface-3);
+  border-radius: var(--radius-pill);
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: var(--space-4);
+}
+.ui-seg::-webkit-scrollbar { display: none; }
+[data-style="c"] .ui-seg { background: none; padding: 0; gap: var(--space-5); border-bottom: 1px solid var(--color-separator); border-radius: 0; }
+.ui-seg-item {
+  flex: 1 0 auto; padding: 8px 14px; border: 0; background: none;
+  border-radius: var(--radius-pill); color: var(--color-text-secondary);
+  font: inherit; font-size: var(--fs-chip); white-space: nowrap; position: relative;
+}
+.ui-seg-item.is-on { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
+[data-style="c"] .ui-seg-item.is-on { background: none; color: var(--color-accent); box-shadow: inset 0 -2px 0 var(--color-accent); border-radius: 0; }
+
+/* --- Кнопки (размеры и радиус из Figma: Large 48, Medium 34, радиус 12) --- */
+.ui-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--control-h-lg); padding: 12px 20px;
+  border: 0; border-radius: var(--radius-md);
+  background: var(--ui-accent-fill); color: var(--ui-accent-text);
+  font: inherit; font-size: var(--fs-button); font-weight: 600;
+  letter-spacing: var(--tracking);
+}
+.ui-btn-sm { min-height: var(--control-h-sm); padding: 6px 14px; font-size: var(--fs-chip); }
+.ui-btn-ghost { background: var(--color-surface-3); color: var(--color-text); }
+.ui-btn-line { background: none; border: 1px solid var(--color-border-mid); color: var(--color-text); }
+.ui-btn-danger { background: var(--color-red); color: #fff; }
+.ui-btn-w { width: 100%; }
+.ui-btn:active { transform: scale(.97); }
+/* Иконка внутри кнопки или чипа всегда одного размера — без этого SVG
+   растягивается на всю строку, потому что у него нет собственных размеров */
+.ui-btn svg, .ui-chip svg, .ui-seg-item svg { width: 17px; height: 17px; flex: 0 0 auto; }
+.ui-btn-sm svg { width: 15px; height: 15px; }
+
+/* --- Значки --- */
+.ui-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: var(--radius-pill);
+  font-size: var(--fs-small); font-weight: 600;
+}
+.ui-badge-ok   { background: var(--color-green-soft-bg); color: var(--color-success-text); }
+.ui-badge-warn { background: var(--color-warn-bg);       color: var(--color-warning); }
+.ui-badge-bad  { background: var(--color-danger-bg);     color: var(--color-danger-line); }
+.ui-badge-mut  { background: var(--color-surface-3);     color: var(--color-text-secondary); }
+
+/* Вид занятия */
+.ui-type-lecture  { background: var(--color-type-1-bg); color: var(--color-type-1-text); }
+.ui-type-practice { background: var(--color-type-2-bg); color: var(--color-type-2-text); }
+.ui-type-lab      { background: var(--color-type-3-bg); color: var(--color-type-3-text); }
+
+/* --- Красная точка непрочитанного --- */
+.ui-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--color-danger);
+  flex: 0 0 auto;
+}
+.ui-dot-abs {
+  position: absolute; top: 6px; right: 50%;
+  margin-right: -16px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--color-danger);
+  box-shadow: 0 0 0 2px var(--ui-tabbar-bg);
+}
+.ui-head-btn .ui-dot-abs { top: 7px; right: 8px; margin-right: 0; box-shadow: 0 0 0 2px var(--color-surface-2); }
+
+/* --- Таб-бар: один на всё приложение, подписи всегда видны --- */
+.ui-tabbar {
+  position: fixed;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--app-inset-bottom) + var(--tabbar-gap));
+  z-index: 40;
+  width: min(100% - 24px, 480px);
+  display: flex;
+  align-items: stretch;
+  padding: 4px;
+  background: var(--ui-tabbar-bg);
+  border: var(--ui-tabbar-border);
+  border-radius: var(--ui-tabbar-radius);
+  box-shadow: var(--ui-tabbar-shadow);
+  backdrop-filter: var(--ui-tabbar-blur);
+  -webkit-backdrop-filter: var(--ui-tabbar-blur);
+}
+[data-style="c"] .ui-tabbar { border-top: 1px solid var(--color-separator); border-radius: 0; width: 100%; left: 0; transform: none; bottom: 0; padding-bottom: calc(var(--app-inset-bottom) + 4px); background: var(--color-bg); }
+.ui-tab {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  padding: 8px 2px;
+  border: 0; background: none;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-tertiary);
+  font: inherit; font-size: var(--fs-tab);
+  letter-spacing: -0.4px;
+  text-decoration: none;
+  position: relative;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.ui-tab svg { width: var(--tab-icon); height: var(--tab-icon); }
+.ui-tab-lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-tab.is-on { color: var(--color-accent); font-weight: 600; }
+.ui-tab.is-on::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ui-tab-pill);
+  z-index: -1;
+}
+[data-style="c"] .ui-tab.is-on::before { display: none; }
+
+/* --- Боковая панель вместо таб-бара от 1024 px --- */
+@media (min-width: 1024px) {
+  .ui-tabbar {
+    left: 0; transform: none;
+    top: 0; bottom: 0;
+    width: 248px;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 2px;
+    padding: var(--space-4) var(--space-3);
+    border-radius: 0;
+    border: 0;
+    border-right: 1px solid var(--color-border);
+    box-shadow: none;
+    overflow-y: auto;
+  }
+  .ui-tab {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    padding: 11px var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-body);
+  }
+  .ui-tab svg { width: 22px; height: 22px; }
+  .ui-tab-lbl { max-width: none; }
+  .ui-dot-abs { position: static; margin: 0 0 0 auto; box-shadow: none; }
+  .ui-app { padding-left: 248px; }
+  .ui-head { padding-left: calc(248px + var(--ui-page-pad)); margin-left: -248px; }
+  .ui-main { padding-bottom: var(--space-8); max-width: 860px; margin-left: var(--space-8); }
+  .ui-fab { left: auto; right: var(--space-8); }
+}
+
+/* --- Плавающая кнопка «+» (только админ) --- */
+.ui-fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--app-inset-bottom) + var(--tabbar-gap) + var(--tabbar-h) + var(--space-3));
+  z-index: 45;
+  width: 56px; height: 56px;
+  display: grid; place-items: center;
+  border: 0; border-radius: var(--radius-pill);
+  background: var(--color-accent); color: #fff;
+  box-shadow: 0 8px 24px rgba(var(--color-accent-rgb), .36);
+  transition: transform var(--dur) var(--ease-spring);
+}
+.ui-fab svg { width: 26px; height: 26px; transition: transform var(--dur) var(--ease-out); }
+.ui-fab.is-open svg { transform: rotate(45deg); }
+.ui-fab:active { transform: scale(.93); }
+
+/* --- Нижний лист со смахиванием --- */
+.ui-scrim {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0, 0, 0, .45);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-out);
+}
+.ui-scrim.is-on { opacity: 1; }
+.ui-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 51;
+  max-height: 88dvh;
+  display: flex; flex-direction: column;
+  background: var(--color-surface);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  padding-bottom: var(--app-inset-bottom);
+  transform: translateY(100%);
+  transition: transform var(--dur-slow) var(--ease-sheet);
+  touch-action: pan-y;
+}
+[data-style="d"] .ui-sheet { background: var(--ui-card-bg); backdrop-filter: var(--ui-card-blur); -webkit-backdrop-filter: var(--ui-card-blur); }
+.ui-sheet.is-on { transform: translateY(0); }
+.ui-sheet.is-drag { transition: none; }
+.ui-sheet-grip {
+  flex: 0 0 auto;
+  width: 40px; height: 4px; margin: 10px auto 2px;
+  border-radius: 2px; background: var(--color-border-strong);
+}
+.ui-sheet-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+.ui-sheet-title { flex: 1 1 auto; font-size: var(--fs-h2); font-weight: 700; color: var(--color-text); }
+.ui-sheet-body { flex: 1 1 auto; overflow-y: auto; padding: 0 var(--space-4) var(--space-5); -webkit-overflow-scrolling: touch; }
+@media (min-width: 1024px) {
+  .ui-sheet { left: 50%; right: auto; bottom: 50%; width: 460px; transform: translate(-50%, 50%) scale(.96); opacity: 0; border-radius: var(--radius-xl); max-height: 80dvh; }
+  .ui-sheet.is-on { transform: translate(-50%, 50%) scale(1); opacity: 1; }
+  .ui-sheet-grip { display: none; }
+}
+
+/* --- Выезжающее меню (вариант навигации 4) --- */
+.ui-drawer {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 51;
+  width: min(84vw, 320px);
+  background: var(--color-surface);
+  padding: calc(var(--app-inset-top) + var(--space-4)) 0 var(--app-inset-bottom);
+  transform: translateX(-100%);
+  transition: transform var(--dur-slow) var(--ease-sheet);
+  overflow-y: auto;
+}
+.ui-drawer.is-on { transform: translateX(0); }
+.ui-drawer-search {
+  width: calc(100% - 2 * var(--space-4));
+  margin: 0 var(--space-4) var(--space-3);
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font: inherit;
+}
+
+/* --- Переходы между экранами --- */
+.ui-view-enter { animation: uiViewIn var(--dur) var(--ease-out) both; }
+@keyframes uiViewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.ui-stagger > * { animation: uiViewIn var(--dur) var(--ease-out) both; }
+.ui-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.ui-stagger > *:nth-child(2) { animation-delay: 30ms; }
+.ui-stagger > *:nth-child(3) { animation-delay: 60ms; }
+.ui-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.ui-stagger > *:nth-child(5) { animation-delay: 120ms; }
+.ui-stagger > *:nth-child(n+6) { animation-delay: 150ms; }
+
+/* Уважение к системной настройке «меньше движения» */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .ui-sheet { transition: none; }
+}
+
+/* --- Мелочи --- */
+.ui-muted { color: var(--color-text-secondary); }
+.ui-empty { text-align: center; color: var(--color-text-tertiary); padding: var(--space-8) var(--space-4); }
+.ui-hr { height: 1px; background: var(--color-separator); border: 0; margin: var(--space-4) 0; }
+.ui-between { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.ui-wrap { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ui-grow { flex: 1 1 auto; min-width: 0; }
+.ui-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.ui-table { width: 100%; border-collapse: collapse; font-size: var(--fs-caption); }
+table.ui-table th, table.ui-table td { padding: 10px var(--space-2); text-align: left; border-bottom: 1px solid var(--color-separator); white-space: nowrap; }
+table.ui-table th { color: var(--color-text-secondary); font-weight: 500; font-size: var(--fs-small); }
+table.ui-table td:first-child, table.ui-table th:first-child { padding-left: var(--ui-card-pad, 0); }
+.ui-input {
+  width: 100%; min-height: var(--control-h); padding: 10px var(--space-3);
+  border-radius: var(--radius-md); border: 1px solid var(--color-border);
+  background: var(--color-surface-3); color: var(--color-text); font: inherit;
+}
+.ui-input:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.ui-label { display: block; font-size: var(--fs-small); color: var(--color-text-secondary); margin: var(--space-3) 0 4px; }
+.ui-ava {
+  width: 72px; height: 72px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--color-accent); color: #fff;
+  font-size: 26px; font-weight: 600;
+  object-fit: cover; overflow: hidden;
+}
+.ui-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.ui-cal-d {
+  aspect-ratio: 1; display: grid; place-items: center;
+  border-radius: 8px; font-size: var(--fs-small);
+  color: var(--color-text-2); position: relative;
+  border: 0; background: none; font: inherit; font-size: var(--fs-small);
+}
+.ui-cal-d.is-mut { color: var(--color-text-disabled); }
+.ui-cal-d.is-today { outline: 1px solid var(--color-accent); }
+.ui-cal-d.has-abs { background: var(--color-danger-bg); color: var(--color-danger-line); }
+.ui-cal-d.has-dl  { background: var(--color-accent-soft); color: #fff; }
+.ui-cal-h { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 6px; }
+.ui-cal-h span { text-align: center; font-size: 11px; color: var(--color-text-tertiary); }
+
+/* Пропуск Studak */
+.ui-pass {
+  aspect-ratio: 100 / 63; border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-hover));
+  color: #fff; padding: var(--space-4);
+  display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: 0 10px 30px rgba(var(--color-accent-rgb), .3);
+}
