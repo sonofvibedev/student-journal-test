@@ -89,7 +89,9 @@ foreach ($htmlName in @("index.html", "cabinet.html")) {
 $files = @(
     "index.html", "cabinet.html", "pass.html",
     "app.css", "profile.css",
-    "env.js", "theme.js", "changelog.js", "shared.js", "profile.js", "studak.js", "schedule.js", "notify.js",
+    "achievements.css",
+    "env.js", "theme.js", "changelog.js", "shared.js", "badges.js", "achievements.js", "profile.js", "studak.js", "schedule.js", "notify.js",
+    "study-days.json",
     "data.json", "manifest.json", "sw.js", "robots.txt", "icons", "fonts"
 )
 foreach ($name in $files) {
