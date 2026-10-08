@@ -112,7 +112,10 @@ function deadlineCard(d) {
   card.className = 'dl-card' + (zachet ? ' is-zachet' : n < 0 ? ' is-over' : n <= 3 ? ' is-soon' : '');
   card.innerHTML = '<div class="dl-subject"></div><div class="dl-text"></div><div class="dl-meta"><span class="dl-date"></span><span class="dl-rel"></span></div>';
   card.querySelector('.dl-subject').textContent = d.subject;
-  if (zachet) card.querySelector('.dl-subject').insertAdjacentHTML('afterbegin', '<span class="dl-kind">' + deadlineKindName(d) + '</span>');
+  // Статус продублирован словом: в гаммах с красным или зелёным акцентом
+  // цвет карточки один в один с акцентом, и по цвету статус не прочитать.
+  const kind = zachet ? deadlineKindName(d) : n < 0 ? 'Просрочено' : n <= 3 ? 'Горит' : '';
+  if (kind) card.querySelector('.dl-subject').insertAdjacentHTML('afterbegin', '<span class="dl-kind">' + kind + '</span>');
   const text = card.querySelector('.dl-text');
   if (d.text) text.textContent = d.text; else text.remove();
   card.querySelector('.dl-date').textContent = zachet ? dlFormatDate(deadlineDate(d.dueDate)) : `до ${dlFormatDate(deadlineDate(d.dueDate))}`;
@@ -246,7 +249,7 @@ function markDeadlinesSeen() {
 // Не мешаем: полям ввода, ползункам, прокручиваемым строкам чипов и таблицам, календарю,
 // открытым окнам и краям экрана (там системный жест «назад» в iOS).
 function enableTabSwipe(order, current, go) {
-  const IGNORE = 'input, select, textarea, [contenteditable], .modal, .sheet, .bottom-tabbar, .feed-chips, .filter-chip-row, .table-responsive, .cal-grid, .no-swipe';
+  const IGNORE = 'input, select, textarea, [contenteditable], .modal, .sheet, .bottom-tabbar, .feed-chips, .filter-chip-row, .table-responsive, .cal-grid, .wk-strip, .no-swipe';
   let start = null;
   document.addEventListener('touchstart', (e) => {
     start = null;
@@ -361,3 +364,40 @@ function enableSheetSwipe(modalEl) {
     }
   });
 }
+
+// ===== Переключатель разделов (.seg) =====
+// Таблетка активной вкладки — псевдоэлемент дорожки; её ширину и сдвиг
+// считаем по самой кнопке, поэтому неважно, сколько вкладок и какой они
+// ширины. Стили — в app.css.
+function segSync(seg) {
+  if (!seg) return;
+  const on = seg.querySelector('[aria-selected="true"]') || seg.querySelector('.seg-item.active');
+  if (!on) { seg.classList.remove('is-ready'); return; }
+  seg.style.setProperty('--seg-w', on.offsetWidth + 'px');
+  seg.style.setProperty('--seg-x', on.offsetLeft - seg.clientLeft + 'px');
+  // Ширина нулевая, пока дорожка скрыта (d-none) — тогда таблетку не показываем
+  if (on.offsetWidth) seg.classList.add('is-ready');
+}
+
+// Дорожка в скрытой вкладке меряется нулём: следим за её размером и
+// пересчитываем, как только она появилась (смена экрана, поворот, шрифты)
+const segRO = typeof ResizeObserver === 'function'
+  ? new ResizeObserver((rows) => rows.forEach((r) => segSync(r.target)))
+  : null;
+
+function segSyncAll() {
+  document.querySelectorAll('.seg').forEach((seg) => {
+    if (segRO && !seg.dataset.segWatched) { seg.dataset.segWatched = '1'; segRO.observe(seg); }
+    segSync(seg);
+  });
+}
+
+// Клик по вкладке: обработчик вкладки отрабатывает первым, после него меряем
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg button, .seg .seg-item');
+  if (btn) requestAnimationFrame(() => segSync(btn.closest('.seg')));
+});
+window.addEventListener('resize', segSyncAll);
+window.addEventListener('pageshow', segSyncAll);
+document.addEventListener('DOMContentLoaded', segSyncAll);
+if (document.readyState !== 'loading') segSyncAll();
